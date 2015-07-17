@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package protos;
+
+// Manifest specifies the entries in a container bundle, keyed and sorted by
+// path.
+message Manifest {
+    repeated Entry entry = 1;
+}
+
+message Entry {
+    // path specifies the path from the bundle root
+    string path = 1;
+
+    // NOTE(stevvooe): Need to define clear precedence for user/group/uid/gid precedence.
+
+    string user = 2;
+    string group = 3;
+
+    string uid = 4; // use string to support windows sid for user/group
+    string gid = 5;
+
+    // mode defines the file mode and permissions. We've used the same
+    // bit-packing from Go's os package,
+    // http://golang.org/pkg/os/#FileMode, since they've done the work of
+    // creating a cross-platform layout.
+    uint32 mode = 6;
+
+    // NOTE(stevvooe): Beyond here, we start defining type specific fields.
+
+    uint64 size = 7;
+
+    // digest specifies the content digest of the target file. Only valid for
+    // regular files. The strings are formatted as <alg>:<digest hex bytes>.
+    // The digests are added in order of precedence favored by the 
+    // generating party.
+    repeated string digest = 8;
+
+    // target defines the target of a hard or soft link, relative to the
+    // bundle root.
+    string target = 9;
+
+    // specifies major and minor device numbers for charactor and block devices.
+    uint32 major = 10;
+    uint32 minor = 11;
+
+    // xattr provides storage for extended attributes for the target resource.
+    repeated KeyValue xattr = 12;
+
+    // TODO(stevvooe): Which xattr wins?
+
+    // ads stores one or more alternate data streams for the target resource.
+    repeated KeyValue ads = 13;
+}
+
+// KeyValue defines a generic key-value mapping type, used for xattrs and NTFS
+// Alternate Data Streams.
+message KeyValue {
+    string name = 1;
+    string value = 2;
+}
