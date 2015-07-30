@@ -10,15 +10,15 @@ import (
 	"syscall"
 
 	"github.com/docker/distribution/digest"
-	"github.com/stevvooe/continuity/protos"
+	pb "github.com/stevvooe/continuity/proto"
 )
 
 // BuildManifest creates the manifest for the root directory. includeFn should
 // return nil for files that should be included in the manifest. The function
 // is called with the unmodified arguments of filepath.Walk.
-func BuildManifest(root string, includeFn filepath.WalkFunc) (*protos.Manifest, error) {
-	entriesByPath := map[string]*protos.Entry{}
-	hardlinks := map[hardlinkKey][]*protos.Entry{}
+func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, error) {
+	entriesByPath := map[string]*pb.Entry{}
+	hardlinks := map[hardlinkKey][]*pb.Entry{}
 
 	gi, err := getGroupIndex()
 	if err != nil {
@@ -43,7 +43,7 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*protos.Manifest, 
 		}
 		sanitized = filepath.Clean(sanitized)
 
-		entry := protos.Entry{
+		entry := pb.Entry{
 			Path: sanitized,
 			Mode: fi.Mode(),
 		}
@@ -178,14 +178,14 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*protos.Manifest, 
 		}
 	}
 
-	var entries []*protos.Entry
+	var entries []*pb.Entry
 	for _, entry := range entriesByPath {
 		entries = append(entries, entry)
 	}
 
 	sort.Sort(byPath(entries))
 
-	return &protos.Manifest{
+	return &pb.Manifest{
 		Entry: entries,
 	}, nil
 }
@@ -213,7 +213,7 @@ func hashPath(p string) (digest.Digest, error) {
 
 }
 
-type byPath []*protos.Entry
+type byPath []*pb.Entry
 
 func (bp byPath) Len() int           { return len(bp) }
 func (bp byPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }

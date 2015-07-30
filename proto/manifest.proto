@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package protos;
+package proto;
 
 // Manifest specifies the entries in a container bundle, keyed and sorted by
 // path.
