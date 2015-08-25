@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 
 	"github.com/docker/distribution/digest"
@@ -96,30 +97,30 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		}
 
 		if fi.Mode()&os.ModeSymlink != 0 {
-			// Walk does not follow symbolic links, but os.Stat does. Simply
-			// stat the path to get the link target. The target must be in the
-			// contianer bundle. If not, the target will be unspecified and
-			// the link will be considered "broken".
-
-			// TODO(stevvooe): Include a leading slash on the symlink to
-			// indicate whether it is absolute. Even though the bundle may be
-			// unpacked at some other root, we treat the bundle root as the
-			// absolute link anchor.
+			// We handle relative links vs absolute links by including a
+			// beginning slash for absolute links. Effectively, the bundle's
+			// root is treated as the absolute link anchor.
 
 			target, err := os.Readlink(p)
 			if err != nil {
 				return err
 			}
 
-			fmt.Println(p, target, filepath.Join(p, target))
 			if filepath.IsAbs(target) {
 				// When path is absolute, we make it relative to the bundle root.
 				target, err = filepath.Rel(root, target)
 				if err != nil {
 					return err
 				}
+
+				// now make the target absolute, since we want to maintain that.
+				target = filepath.Join("/", target)
 			} else {
 				// make sure the target is contained in the root.
+				real := filepath.Join(p, target)
+				if !strings.HasPrefix(real, root) {
+					return fmt.Errorf("link refers to file outside of root: %q -> %q", p, target)
+				}
 			}
 
 			entry.Target = target

@@ -88,6 +88,15 @@ func TestWalkFS(t *testing.T) {
 			mode:   0600,
 			target: "a",
 		},
+		// TODO(stevvooe): Make sure we can test this case and get proper
+		// errors when it is encountered.
+		// {
+		// 	// create a bad symlink and make sure we don't include it.
+		// 	kind:   relsymlink,
+		// 	path:   "c/a-badsymlink",
+		// 	mode:   0600,
+		// 	target: "../../..",
+		// },
 		{
 			kind: namedpipe,
 			path: "fifo",
