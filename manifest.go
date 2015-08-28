@@ -66,6 +66,9 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 
 		if fi.Mode().IsRegular() {
 			entry.Size = uint64(fi.Size())
+
+			// TODO(stevvooe): The nlinks technique is not always reliable on
+			// certain filesystems. Must use the dev, inode to join them.
 			if sysStat.Nlink < 2 {
 				dgst, err := hashPath(p)
 				if err != nil {
@@ -189,6 +192,10 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 	return &pb.Manifest{
 		Entry: entries,
 	}, nil
+}
+
+func ApplyManifest(root string, manifest *pb.Manifest) error {
+	panic("not implemented")
 }
 
 // sanitize and clean the path relative to root.
