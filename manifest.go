@@ -44,8 +44,8 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		}
 
 		entry := pb.Entry{
-			Path: sanitized,
-			Mode: fi.Mode(),
+			Path: []string{sanitized},
+			Mode: uint32(fi.Mode()),
 		}
 
 		sysStat := fi.Sys().(*syscall.Stat_t)
@@ -64,35 +64,35 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		// TODO(stevvooe): Handle xattrs.
 		// TODO(stevvooe): Handle ads.
 
-		if fi.Mode().IsRegular() && sysStat.Nlink < 2 {
-			dgst, err := hashPath(p)
-			if err != nil {
-				return err
+		if fi.Mode().IsRegular() {
+			entry.Size = uint64(fi.Size())
+			if sysStat.Nlink < 2 {
+				dgst, err := hashPath(p)
+				if err != nil {
+					return err
+				}
+
+				entry.Digest = append(entry.Digest, dgst.String())
+			} else if sysStat.Nlink > 1 { // hard links
+				// Properties of hard links:
+				//	- nlinks > 1 (not all filesystems)
+				//	- identical dev and inode number for two files
+				//	- consider the file with the earlier ctime the "canonical" path
+				//
+				// How will this be done?
+				//	- check nlinks to detect hard links
+				//		-> add them to map by dev, inode
+				//	- hard links are represented by a single entry with multiple paths
+				//	- defer addition to entries until after all entries are seen
+				key := hardlinkKey{dev: sysStat.Dev, inode: sysStat.Ino}
+
+				// add the hardlink
+				hardlinks[key] = append(hardlinks[key], &entry)
+
+				// TODO(stevvooe): Possibly use os.SameFile here?
+
+				return nil // hardlinks are postprocessed, so we exit
 			}
-
-			entry.Digest = append(entry.Digest, dgst.String())
-		}
-
-		if fi.Mode().IsRegular() && sysStat.Nlink > 1 { // hard links
-			// Properties of hard links:
-			//	- nlinks > 1 (not all filesystems)
-			//	- identical dev and inode number for two files
-			//	- consider the file with the earlier ctime the "canonical" path
-			//
-			// How will this be done?
-			//	- check nlinks to detect hard links
-			//		-> add them to map by dev, inode
-			//	- hard links are still set as regular files with target set
-			//	- rather than recalculate digest, use other entry
-			//	- defer addition to entries until after all entries are seen
-			key := hardlinkKey{dev: sysStat.Dev, inode: sysStat.Ino}
-
-			// add the hardlink
-			hardlinks[key] = append(hardlinks[key], &entry)
-
-			// TODO(stevvooe): Possibly use os.SameFile here?
-
-			return nil // hardlinks are postprocessed, so we exit
 		}
 
 		if fi.Mode()&os.ModeSymlink != 0 {
@@ -159,23 +159,24 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 
 		canonical, rest := linked[0], linked[1:]
 
-		dgst, err := hashPath(filepath.Join(root, canonical.Path))
+		dgst, err := hashPath(filepath.Join(root, canonical.Path[0]))
 		if err != nil {
 			return nil, err
 		}
 
 		// canonical gets appended like a regular file.
 		canonical.Digest = append(canonical.Digest, dgst.String())
-		entriesByPath[canonical.Path] = canonical
+		entriesByPath[canonical.Path[0]] = canonical
 
 		// process the links.
 		for _, link := range rest {
 			// a hardlink is a regular file with a target instead of a digest.
 			// We can just set the target from the canonical path since
 			// hardlinks are alwas
-			link.Target = canonical.Path
-			entriesByPath[link.Path] = link
+			canonical.Path = append(canonical.Path, link.Path...)
 		}
+
+		sort.Strings(canonical.Path)
 	}
 
 	var entries []*pb.Entry
@@ -227,4 +228,4 @@ type byPath []*pb.Entry
 
 func (bp byPath) Len() int           { return len(bp) }
 func (bp byPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
-func (bp byPath) Less(i, j int) bool { return bp[i].Path < bp[j].Path }
+func (bp byPath) Less(i, j int) bool { return bp[i].Path[0] < bp[j].Path[0] } // sort by first path entry.

@@ -38,12 +38,14 @@ func (m *Manifest) GetEntry() []*Entry {
 }
 
 type Entry struct {
-	// path specifies the path from the bundle root
-	Path  string `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
-	User  string `protobuf:"bytes,2,opt,name=user" json:"user,omitempty"`
-	Group string `protobuf:"bytes,3,opt,name=group" json:"group,omitempty"`
-	Uid   string `protobuf:"bytes,4,opt,name=uid" json:"uid,omitempty"`
-	Gid   string `protobuf:"bytes,5,opt,name=gid" json:"gid,omitempty"`
+	// Path specifies the path from the bundle root. If more than one
+	// path is present, the entry may represent a hardlink, rather than using
+	// a link target.
+	Path  []string `protobuf:"bytes,1,rep,name=path" json:"path,omitempty"`
+	User  string   `protobuf:"bytes,2,opt,name=user" json:"user,omitempty"`
+	Group string   `protobuf:"bytes,3,opt,name=group" json:"group,omitempty"`
+	Uid   string   `protobuf:"bytes,4,opt,name=uid" json:"uid,omitempty"`
+	Gid   string   `protobuf:"bytes,5,opt,name=gid" json:"gid,omitempty"`
 	// mode defines the file mode and permissions. We've used the same
 	// bit-packing from Go's os package,
 	// http://golang.org/pkg/os/#FileMode, since they've done the work of
@@ -95,6 +97,3 @@ type KeyValue struct {
 func (m *KeyValue) Reset()         { *m = KeyValue{} }
 func (m *KeyValue) String() string { return proto1.CompactTextString(m) }
 func (*KeyValue) ProtoMessage()    {}
-
-func init() {
-}

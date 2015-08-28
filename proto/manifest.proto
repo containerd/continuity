@@ -9,8 +9,10 @@ message Manifest {
 }
 
 message Entry {
-    // path specifies the path from the bundle root
-    string path = 1;
+    // Path specifies the path from the bundle root. If more than one
+    // path is present, the entry may represent a hardlink, rather than using
+    // a link target.
+    repeated string path = 1;
 
     // NOTE(stevvooe): Need to define clear precedence for user/group/uid/gid precedence.
 
