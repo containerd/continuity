@@ -38,11 +38,10 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 			return nil
 		}
 
-		sanitized, err := filepath.Rel(root, p)
+		sanitized, err := sanitize(root, p)
 		if err != nil {
-			return nil
+			return err
 		}
-		sanitized = filepath.Clean(sanitized)
 
 		entry := pb.Entry{
 			Path: sanitized,
@@ -189,6 +188,16 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 	return &pb.Manifest{
 		Entry: entries,
 	}, nil
+}
+
+// sanitize and clean the path relative to root.
+func sanitize(root, p string) (string, error) {
+	sanitized, err := filepath.Rel(root, p)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Clean(sanitized), nil
 }
 
 // hardlinkKey provides a tuple-key for managing hardlinks.
