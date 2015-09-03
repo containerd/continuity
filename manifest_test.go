@@ -97,6 +97,10 @@ func TestWalkFS(t *testing.T) {
 		// 	mode:   0600,
 		// 	target: "../../..",
 		// },
+
+		// TODO(stevvooe): Must add tests for xattrs, with symlinks,
+		// directorys and regular files.
+
 		{
 			kind: namedpipe,
 			path: "fifo",
