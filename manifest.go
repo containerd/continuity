@@ -61,28 +61,35 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		entry.Group = gi.byGID[int(gid)].name
 		entry.Gid = fmt.Sprint(gid)
 
-		// TODO(stevvooe): Handle xattrs.
-		xattrs, err := Listxattr(p)
-		if err != nil {
-			log.Println("error listing xattrs ", p)
-			return err
-		}
+		if fi.Mode().IsRegular() || fi.Mode().IsDir() || fi.Mode()&os.ModeSymlink != 0 {
+			// Restricts xattrs to only the above file types. This allowance
+			// of symlinks is slightly questionable, since their support is
+			// spotty on most file systems and xattrs are generally stored in
+			// the inode.
 
-		sort.Strings(xattrs)
-
-		// TODO(stevvooe): This is very preliminary support for xattrs. We
-		// still need to ensure that links aren't being followed.
-		for _, attr := range xattrs {
-			value, err := Getxattr(p, attr)
+			// TODO(stevvooe): Handle xattrs.
+			xattrs, err := Listxattr(p)
 			if err != nil {
-				log.Printf("error getting xattrs: %v %q %v %v", p, attr, xattrs, len(xattrs))
+				log.Println("error listing xattrs ", p)
 				return err
 			}
 
-			entry.Xattr = append(entry.Xattr, &pb.KeyValue{
-				Name:  attr,
-				Value: string(value),
-			})
+			sort.Strings(xattrs)
+
+			// TODO(stevvooe): This is very preliminary support for xattrs. We
+			// still need to ensure that links aren't being followed.
+			for _, attr := range xattrs {
+				value, err := Getxattr(p, attr)
+				if err != nil {
+					log.Printf("error getting xattrs: %v %q %v %v", p, attr, xattrs, len(xattrs))
+					return err
+				}
+
+				entry.Xattr = append(entry.Xattr, &pb.KeyValue{
+					Name:  attr,
+					Value: string(value),
+				})
+			}
 		}
 
 		// TODO(stevvooe): Handle windows alternate data streams.
