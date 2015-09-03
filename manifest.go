@@ -62,7 +62,30 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		entry.Gid = fmt.Sprint(gid)
 
 		// TODO(stevvooe): Handle xattrs.
-		// TODO(stevvooe): Handle ads.
+		xattrs, err := Listxattr(p)
+		if err != nil {
+			log.Println("error listing xattrs ", p)
+			return err
+		}
+
+		sort.Strings(xattrs)
+
+		// TODO(stevvooe): This is very preliminary support for xattrs. We
+		// still need to ensure that links aren't being followed.
+		for _, attr := range xattrs {
+			value, err := Getxattr(p, attr)
+			if err != nil {
+				log.Printf("error getting xattrs: %v %q %v %v", p, attr, xattrs, len(xattrs))
+				return err
+			}
+
+			entry.Xattr = append(entry.Xattr, &pb.KeyValue{
+				Name:  attr,
+				Value: string(value),
+			})
+		}
+
+		// TODO(stevvooe): Handle windows alternate data streams.
 
 		if fi.Mode().IsRegular() {
 			entry.Size = uint64(fi.Size())
