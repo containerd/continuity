@@ -204,7 +204,7 @@ func (c *Context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	// symlinks is slightly questionable, since their support is spotty on
 	// most file systems and xattrs are generally stored in the inode. This
 	// may belong elsewhere.
-	if !(fi.Mode().IsRegular() || fi.Mode().IsDir() || fi.Mode()&os.ModeSymlink != 0) {
+	if !(fi.Mode().IsRegular() || fi.Mode().IsDir()) {
 		return nil, nil
 	}
 

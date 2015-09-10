@@ -7,7 +7,7 @@ func getxattr(path string, attr string, dest []byte) (sz int, err error) {
 }
 
 func listxattr(path string, dest []byte, flags int) (sz int, err error) {
-	return unix.Listxattr(path, dest, flags)
+	return unix.Listxattr(path, dest)
 }
 
 func removexattr(path string, attr string) (err error) {

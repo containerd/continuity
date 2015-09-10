@@ -9,7 +9,7 @@ import (
 // hardlinkKey provides a tuple-key for managing hardlinks. This is system-
 // specific.
 type hardlinkKey struct {
-	dev   int32
+	dev   uint64
 	inode uint64
 }
 
