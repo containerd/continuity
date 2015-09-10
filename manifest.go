@@ -68,9 +68,9 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		resourcesByPath[resource.Path()] = resource
 	}
 
-	var entries []*pb.Entry
+	var entries []*pb.Resource
 	for _, resource := range resourcesByPath {
-		entry := &pb.Entry{
+		entry := &pb.Resource{
 			Path: []string{resource.Path()},
 			Mode: uint32(resource.Mode()),
 			Uid:  resource.UID(),
@@ -78,12 +78,7 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		}
 
 		if xattrer, ok := resource.(XAttrer); ok {
-			for attr, value := range xattrer.XAttrs() {
-				entry.Xattr = append(entry.Xattr, &pb.KeyValue{
-					Name:  attr,
-					Value: string(value),
-				})
-			}
+			entry.Xattr = xattrer.XAttrs()
 		}
 
 		switch r := resource.(type) {
@@ -101,7 +96,6 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 		// enforce a few stability guarantees that may not be provided by the
 		// resource implementation.
 		sort.Strings(entry.Path)
-		sort.Stable(keyValuebyAttributeName(entry.Xattr))
 
 		entries = append(entries, entry)
 	}
@@ -109,7 +103,7 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 	sort.Sort(byPath(entries))
 
 	return &pb.Manifest{
-		Entry: entries,
+		Resource: entries,
 	}, nil
 }
 
@@ -117,14 +111,8 @@ func ApplyManifest(root string, manifest *pb.Manifest) error {
 	panic("not implemented")
 }
 
-type byPath []*pb.Entry
+type byPath []*pb.Resource
 
 func (bp byPath) Len() int           { return len(bp) }
 func (bp byPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
 func (bp byPath) Less(i, j int) bool { return bp[i].Path[0] < bp[j].Path[0] } // sort by first path entry.
-
-type keyValuebyAttributeName []*pb.KeyValue
-
-func (bp keyValuebyAttributeName) Len() int           { return len(bp) }
-func (bp keyValuebyAttributeName) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
-func (bp keyValuebyAttributeName) Less(i, j int) bool { return bp[i].Name < bp[j].Name }

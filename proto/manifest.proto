@@ -5,24 +5,31 @@ package proto;
 // Manifest specifies the entries in a container bundle, keyed and sorted by
 // path.
 message Manifest {
-    repeated Entry entry = 1;
+    repeated Resource resource = 1;
 }
 
-message Entry {
+message Resource {
     // Path specifies the path from the bundle root. If more than one
     // path is present, the entry may represent a hardlink, rather than using
-    // a link target.
+    // a link target. The path format is operating system specific.
     repeated string path = 1;
 
     // NOTE(stevvooe): Need to define clear precedence for user/group/uid/gid precedence.
 
-    string user = 2;
-    string group = 3;
+    // Uid specifies the user id for the resource. A string type is used for
+    // compatibility across different OS.
+    string uid = 2;
 
-    string uid = 4; // use string to support windows sid for user/group
-    string gid = 5;
+    // Gid specifies the group id for the resource. A string type is used for
+    // compatibility across different OS.
+    string gid = 3;
 
-    // mode defines the file mode and permissions. We've used the same
+    // user and group are not currently used but their field numbers have been
+    // reserved for future use. As such, they are marked as deprecated.
+    string user = 4 [deprecated=true];
+    string group = 5 [deprecated=true];
+
+    // Mode defines the file mode and permissions. We've used the same
     // bit-packing from Go's os package,
     // http://golang.org/pkg/os/#FileMode, since they've done the work of
     // creating a cross-platform layout.
@@ -30,34 +37,41 @@ message Entry {
 
     // NOTE(stevvooe): Beyond here, we start defining type specific fields.
 
+    // Size specifies the size in bytes of the resource. This is only valid
+    // for regular files.
     uint64 size = 7;
 
-    // digest specifies the content digest of the target file. Only valid for
+    // Digest specifies the content digest of the target file. Only valid for
     // regular files. The strings are formatted as <alg>:<digest hex bytes>.
     // The digests are added in order of precedence favored by the 
     // generating party.
     repeated string digest = 8;
 
-    // target defines the target of a hard or soft link, relative to the
-    // bundle root.
+    // Target defines the target of a hard or soft link. Absolute links start
+    // with a slash and specify the resource relative to the bundle root.
+    // Relative links do not start with a slash and are relative to the
+    // resource path.
     string target = 9;
 
-    // specifies major and minor device numbers for charactor and block devices.
+    // Major specifies the major device number for charactor and block devices.
     uint32 major = 10;
+
+    // Minor specifies the minor device number for charactor and block devices.
     uint32 minor = 11;
 
-    // xattr provides storage for extended attributes for the target resource.
-    repeated KeyValue xattr = 12;
+    // TODO(stevvooe): The use of maps here may be problematic for
+    // deterministic generation. Check out this comment:
+    // https://developers.google.com/protocol-buffers/docs/proto3#backwards-compatibility
+    // Fortunately, the Go implementation correctly sorts the map keys to
+    // ensure deterministic generation, but this is not guaranteed for all
+    // implementations. If this is problem, we should generate that schema and
+    // sort by key. We can do this at any time and retain backwards
+    // compatibility.
 
-    // TODO(stevvooe): Which xattr wins?
+    // Xattr provides storage for extended attributes for the target resource.
+    map<string, bytes> xattr = 12;
 
-    // ads stores one or more alternate data streams for the target resource.
-    repeated KeyValue ads = 13;
-}
+    // Ads stores one or more alternate data streams for the target resource.
+    map<string, bytes> ads = 13;
 
-// KeyValue defines a generic key-value mapping type, used for xattrs and NTFS
-// Alternate Data Streams.
-message KeyValue {
-    string name = 1;
-    string value = 2;
 }

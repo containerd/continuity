@@ -10,8 +10,7 @@ It is generated from these files:
 
 It has these top-level messages:
 	Manifest
-	Entry
-	KeyValue
+	Resource
 */
 package proto
 
@@ -23,77 +22,77 @@ var _ = proto1.Marshal
 // Manifest specifies the entries in a container bundle, keyed and sorted by
 // path.
 type Manifest struct {
-	Entry []*Entry `protobuf:"bytes,1,rep,name=entry" json:"entry,omitempty"`
+	Resource []*Resource `protobuf:"bytes,1,rep,name=resource" json:"resource,omitempty"`
 }
 
 func (m *Manifest) Reset()         { *m = Manifest{} }
 func (m *Manifest) String() string { return proto1.CompactTextString(m) }
 func (*Manifest) ProtoMessage()    {}
 
-func (m *Manifest) GetEntry() []*Entry {
+func (m *Manifest) GetResource() []*Resource {
 	if m != nil {
-		return m.Entry
+		return m.Resource
 	}
 	return nil
 }
 
-type Entry struct {
+type Resource struct {
 	// Path specifies the path from the bundle root. If more than one
 	// path is present, the entry may represent a hardlink, rather than using
-	// a link target.
-	Path  []string `protobuf:"bytes,1,rep,name=path" json:"path,omitempty"`
-	User  string   `protobuf:"bytes,2,opt,name=user" json:"user,omitempty"`
-	Group string   `protobuf:"bytes,3,opt,name=group" json:"group,omitempty"`
-	Uid   string   `protobuf:"bytes,4,opt,name=uid" json:"uid,omitempty"`
-	Gid   string   `protobuf:"bytes,5,opt,name=gid" json:"gid,omitempty"`
-	// mode defines the file mode and permissions. We've used the same
+	// a link target. The path format is operating system specific.
+	Path []string `protobuf:"bytes,1,rep,name=path" json:"path,omitempty"`
+	// Uid specifies the user id for the resource. A string type is used for
+	// compatibility across different OS.
+	Uid string `protobuf:"bytes,2,opt,name=uid" json:"uid,omitempty"`
+	// Gid specifies the group id for the resource. A string type is used for
+	// compatibility across different OS.
+	Gid string `protobuf:"bytes,3,opt,name=gid" json:"gid,omitempty"`
+	// user and group are not currently used but their field numbers have been
+	// reserved for future use. As such, they are marked as deprecated.
+	User  string `protobuf:"bytes,4,opt,name=user" json:"user,omitempty"`
+	Group string `protobuf:"bytes,5,opt,name=group" json:"group,omitempty"`
+	// Mode defines the file mode and permissions. We've used the same
 	// bit-packing from Go's os package,
 	// http://golang.org/pkg/os/#FileMode, since they've done the work of
 	// creating a cross-platform layout.
 	Mode uint32 `protobuf:"varint,6,opt,name=mode" json:"mode,omitempty"`
+	// Size specifies the size in bytes of the resource. This is only valid
+	// for regular files.
 	Size uint64 `protobuf:"varint,7,opt,name=size" json:"size,omitempty"`
-	// digest specifies the content digest of the target file. Only valid for
+	// Digest specifies the content digest of the target file. Only valid for
 	// regular files. The strings are formatted as <alg>:<digest hex bytes>.
 	// The digests are added in order of precedence favored by the
 	// generating party.
 	Digest []string `protobuf:"bytes,8,rep,name=digest" json:"digest,omitempty"`
-	// target defines the target of a hard or soft link, relative to the
-	// bundle root.
+	// Target defines the target of a hard or soft link. Absolute links start
+	// with a slash and specify the resource relative to the bundle root.
+	// Relative links do not start with a slash and are relative to the
+	// resource path.
 	Target string `protobuf:"bytes,9,opt,name=target" json:"target,omitempty"`
-	// specifies major and minor device numbers for charactor and block devices.
+	// Major specifies the major device number for charactor and block devices.
 	Major uint32 `protobuf:"varint,10,opt,name=major" json:"major,omitempty"`
+	// Minor specifies the minor device number for charactor and block devices.
 	Minor uint32 `protobuf:"varint,11,opt,name=minor" json:"minor,omitempty"`
-	// xattr provides storage for extended attributes for the target resource.
-	Xattr []*KeyValue `protobuf:"bytes,12,rep,name=xattr" json:"xattr,omitempty"`
-	// ads stores one or more alternate data streams for the target resource.
-	Ads []*KeyValue `protobuf:"bytes,13,rep,name=ads" json:"ads,omitempty"`
+	// Xattr provides storage for extended attributes for the target resource.
+	Xattr map[string][]byte `protobuf:"bytes,12,rep,name=xattr" json:"xattr,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Ads stores one or more alternate data streams for the target resource.
+	Ads map[string][]byte `protobuf:"bytes,13,rep,name=ads" json:"ads,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *Entry) Reset()         { *m = Entry{} }
-func (m *Entry) String() string { return proto1.CompactTextString(m) }
-func (*Entry) ProtoMessage()    {}
+func (m *Resource) Reset()         { *m = Resource{} }
+func (m *Resource) String() string { return proto1.CompactTextString(m) }
+func (*Resource) ProtoMessage()    {}
 
-func (m *Entry) GetXattr() []*KeyValue {
+func (m *Resource) GetXattr() map[string][]byte {
 	if m != nil {
 		return m.Xattr
 	}
 	return nil
 }
 
-func (m *Entry) GetAds() []*KeyValue {
+func (m *Resource) GetAds() map[string][]byte {
 	if m != nil {
 		return m.Ads
 	}
 	return nil
 }
-
-// KeyValue defines a generic key-value mapping type, used for xattrs and NTFS
-// Alternate Data Streams.
-type KeyValue struct {
-	Name  string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Value string `protobuf:"bytes,2,opt,name=value" json:"value,omitempty"`
-}
-
-func (m *KeyValue) Reset()         { *m = KeyValue{} }
-func (m *KeyValue) String() string { return proto1.CompactTextString(m) }
-func (*KeyValue) ProtoMessage()    {}

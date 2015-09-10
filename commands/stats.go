@@ -31,7 +31,7 @@ var (
 				symlinks    int
 			}
 
-			for _, entry := range bm.Entry {
+			for _, entry := range bm.Resource {
 				stats.resources++
 				stats.totalSize += int64(entry.Size)
 

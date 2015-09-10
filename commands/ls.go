@@ -7,7 +7,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/dustin/go-humanize"
-
 	"github.com/spf13/cobra"
 )
 
@@ -26,8 +25,7 @@ var LSCmd = &cobra.Command{
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 
-		for _, entry := range bm.Entry {
-
+		for _, entry := range bm.Resource {
 			for _, path := range entry.Path {
 				fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path)
 			}
