@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/docker/distribution/digest"
-
 	"github.com/golang/protobuf/proto"
 )
 
@@ -34,35 +33,35 @@ func TestWalkFS(t *testing.T) {
 	//			- parent directory - absolute, out of root
 	//		- regular files
 	//		- character devices
+	//		- what about sticky bits?
 	// 2. Build the manifest.
 	// 3. Verify expected result.
-
-	testResources := []resource{
+	testResources := []dresource{
 		{
 			path: "a",
 			mode: 0644,
 		},
 		{
-			kind:   hardlink,
+			kind:   rhardlink,
 			path:   "a-hardlink",
 			target: "a",
 		},
 		{
-			kind: directory,
+			kind: rdirectory,
 			path: "b",
 			mode: 0755,
 		},
 		{
-			kind:   hardlink,
+			kind:   rhardlink,
 			path:   "b/a-hardlink",
 			target: "a",
 		},
 		{
 			path: "b/a",
-			mode: 0600,
+			mode: 0600 | os.ModeSticky,
 		},
 		{
-			kind: directory,
+			kind: rdirectory,
 			path: "c",
 			mode: 0755,
 		},
@@ -71,19 +70,19 @@ func TestWalkFS(t *testing.T) {
 			mode: 0644,
 		},
 		{
-			kind:   relsymlink,
+			kind:   rrelsymlink,
 			path:   "c/ca-relsymlink",
 			mode:   0600,
 			target: "a",
 		},
 		{
-			kind:   relsymlink,
+			kind:   rrelsymlink,
 			path:   "c/a-relsymlink",
 			mode:   0600,
 			target: "../a",
 		},
 		{
-			kind:   abssymlink,
+			kind:   rabssymlink,
 			path:   "c/a-abssymlink",
 			mode:   0600,
 			target: "a",
@@ -102,16 +101,22 @@ func TestWalkFS(t *testing.T) {
 		// directorys and regular files.
 
 		{
-			kind: namedpipe,
+			kind: rnamedpipe,
 			path: "fifo",
 			mode: 0666 | os.ModeNamedPipe,
+		},
+
+		{
+			kind: rdirectory,
+			path: "/dev",
+			mode: 0755,
 		},
 
 		// NOTE(stevvooe): Below here, we add a few simple character devices.
 		// Block devices are untested but should be nearly the same as
 		// character devices.
-		devNullResource,
-		devZeroResource,
+		// devNullResource,
+		// devZeroResource,
 	}
 
 	root, err := ioutil.TempDir("", "continuity-test-")
@@ -125,7 +130,7 @@ func TestWalkFS(t *testing.T) {
 
 	bm, err := BuildManifest(root, nil)
 	if err != nil {
-		t.Fatalf("error building manifest: %v", err)
+		t.Fatalf("error building manifest: %v, %#T", err, err)
 	}
 
 	proto.MarshalText(os.Stdout, bm)
@@ -135,20 +140,19 @@ func TestWalkFS(t *testing.T) {
 // TODO(stevvooe): At this time, we have a nice testing framework to define
 // and build resources. This will likely be a pre-cursor to the packages
 // public interface.
-
 type kind int
 
 func (k kind) String() string {
 	switch k {
-	case file:
+	case rfile:
 		return "file"
-	case directory:
+	case rdirectory:
 		return "directory"
-	case hardlink:
+	case rhardlink:
 		return "hardlink"
-	case chardev:
+	case rchardev:
 		return "chardev"
-	case namedpipe:
+	case rnamedpipe:
 		return "namedpipe"
 	}
 
@@ -156,16 +160,16 @@ func (k kind) String() string {
 }
 
 const (
-	file kind = iota
-	directory
-	hardlink
-	relsymlink
-	abssymlink
-	chardev
-	namedpipe
+	rfile kind = iota
+	rdirectory
+	rhardlink
+	rrelsymlink
+	rabssymlink
+	rchardev
+	rnamedpipe
 )
 
-type resource struct {
+type dresource struct {
 	kind         kind
 	path         string
 	mode         os.FileMode
@@ -174,11 +178,11 @@ type resource struct {
 	major, minor int
 }
 
-func generateTestFiles(t *testing.T, root string, resources []resource) {
+func generateTestFiles(t *testing.T, root string, resources []dresource) {
 	for i, resource := range resources {
 		p := filepath.Join(root, resource.path)
 		switch resource.kind {
-		case file:
+		case rfile:
 			size := rand.Intn(4 << 20)
 			d := make([]byte, size)
 			randomBytes(d)
@@ -192,34 +196,33 @@ func generateTestFiles(t *testing.T, root string, resources []resource) {
 			if err := ioutil.WriteFile(p, d, resource.mode); err != nil {
 				t.Fatalf("error writing %q: %v", p, err)
 			}
-		case directory:
+		case rdirectory:
 			if err := os.Mkdir(p, resource.mode); err != nil {
 				t.Fatalf("error creating directory %q: %v", err)
 			}
-		case hardlink:
+		case rhardlink:
 			target := filepath.Join(root, resource.target)
 			if err := os.Link(target, p); err != nil {
 				t.Fatalf("error creating hardlink: %v", err)
 			}
-		case relsymlink:
+		case rrelsymlink:
 			if err := os.Symlink(resource.target, p); err != nil {
 				t.Fatalf("error creating symlink: %v", err)
 			}
-		case abssymlink:
+		case rabssymlink:
 			// for absolute links, we join with root.
 			target := filepath.Join(root, resource.target)
 
 			if err := os.Symlink(target, p); err != nil {
 				t.Fatalf("error creating symlink: %v", err)
 			}
-		case chardev, namedpipe:
+		case rchardev, rnamedpipe:
 			if err := mknod(p, resource.mode, resource.major, resource.minor); err != nil {
 				t.Fatalf("error creating device %q: %v", p, err)
 			}
 		default:
 			t.Fatalf("unknown resource type: %v", resource.kind)
 		}
-
 	}
 
 	// log the test root for future debugging

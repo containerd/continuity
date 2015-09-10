@@ -24,12 +24,12 @@ var (
 
 			m, err := continuity.BuildManifest(args[0], nil)
 			if err != nil {
-				log.Fatalln("error generating manifest: %v", err)
+				log.Fatalf("error generating manifest: %v", err)
 			}
 
 			p, err := proto.Marshal(m)
 			if err != nil {
-				log.Fatalln("error marshing manifest: %v", err)
+				log.Fatalf("error marshing manifest: %v", err)
 			}
 
 			os.Stdout.Write(p)

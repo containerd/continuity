@@ -1,16 +1,11 @@
 package continuity
 
 import (
-	"fmt"
-	"io"
+	"log"
 	"os"
-	"os/user"
 	"path/filepath"
 	"sort"
-	"strings"
-	"syscall"
 
-	"github.com/docker/distribution/digest"
 	pb "github.com/stevvooe/continuity/proto"
 )
 
@@ -18,73 +13,72 @@ import (
 // return nil for files that should be included in the manifest. The function
 // is called with the unmodified arguments of filepath.Walk.
 func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, error) {
-	entriesByPath := map[string]*pb.Entry{}
-	hardlinks := map[hardlinkKey][]*pb.Entry{}
-
-	gi, err := getGroupIndex()
+	ctx, err := NewContext(root)
 	if err != nil {
+		log.Println("error creating context")
 		return nil, err
 	}
 
-	// normalize to absolute path
-	root, err = filepath.Abs(filepath.Clean(root))
-	if err != nil {
-		return nil, err
-	}
+	resourcesByPath := map[string]Resource{}
+	hardlinks := newHardlinkManager()
 
-	if err := filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
-		if p == root {
+	if err := ctx.Walk(func(p string, fi os.FileInfo, err error) error {
+		if p == ctx.root {
 			// skip the root
 			return nil
 		}
 
-		sanitized, err := sanitize(root, p)
+		sanitized, err := ctx.Sanitize(p)
 		if err != nil {
 			return err
 		}
 
-		entry := pb.Entry{
-			Path: []string{sanitized},
-			Mode: uint32(fi.Mode()),
-		}
-
-		sysStat := fi.Sys().(*syscall.Stat_t)
-
-		uid, gid := sysStat.Uid, sysStat.Gid
-
-		u, err := user.LookupId(fmt.Sprint(uid))
+		resource, err := ctx.Resource(sanitized, fi)
 		if err != nil {
-			return err
-		}
-		entry.User = u.Username
-		entry.Uid = fmt.Sprint(uid)
-		entry.Group = gi.byGID[int(gid)].name
-		entry.Gid = fmt.Sprint(gid)
-
-		if fi.Mode().IsRegular() || fi.Mode().IsDir() || fi.Mode()&os.ModeSymlink != 0 {
-			// Restricts xattrs to only the above file types. This allowance
-			// of symlinks is slightly questionable, since their support is
-			// spotty on most file systems and xattrs are generally stored in
-			// the inode.
-
-			// TODO(stevvooe): Handle xattrs.
-			xattrs, err := Listxattr(p)
-			if err != nil {
-				log.Println("error listing xattrs ", p)
-				return err
+			if err == ErrNotFound {
+				return nil
 			}
+			return err
+		}
 
-			sort.Strings(xattrs)
+		// add to the hardlink manager
+		if err := hardlinks.Add(p, fi, resource); err == nil {
+			// Resource has been accepted by hardlink manager so we don't add
+			// it to the resourcesByPath until we merge at the end.
+			return nil
+		} else if err != errNotAHardLink {
+			// handle any other case where we have a proper error.
+			return err
+		}
 
-			// TODO(stevvooe): This is very preliminary support for xattrs. We
-			// still need to ensure that links aren't being followed.
-			for _, attr := range xattrs {
-				value, err := Getxattr(p, attr)
-				if err != nil {
-					log.Printf("error getting xattrs: %v %q %v %v", p, attr, xattrs, len(xattrs))
-					return err
-				}
+		resourcesByPath[p] = resource
 
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	// merge and post-process the hardlinks.
+	hardlinked, err := hardlinks.Merge()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, resource := range hardlinked {
+		resourcesByPath[resource.Path()] = resource
+	}
+
+	var entries []*pb.Entry
+	for _, resource := range resourcesByPath {
+		entry := &pb.Entry{
+			Path: []string{resource.Path()},
+			Mode: uint32(resource.Mode()),
+			Uid:  resource.UID(),
+			Gid:  resource.GID(),
+		}
+
+		if xattrer, ok := resource.(XAttrer); ok {
+			for attr, value := range xattrer.XAttrs() {
 				entry.Xattr = append(entry.Xattr, &pb.KeyValue{
 					Name:  attr,
 					Value: string(value),
@@ -92,128 +86,23 @@ func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, erro
 			}
 		}
 
-		// TODO(stevvooe): Handle windows alternate data streams.
+		switch r := resource.(type) {
+		case RegularFile:
+			entry.Path = r.Paths()
+			entry.Size = uint64(r.Size())
 
-		if fi.Mode().IsRegular() {
-			entry.Size = uint64(fi.Size())
-
-			// TODO(stevvooe): The nlinks technique is not always reliable on
-			// certain filesystems. Must use the dev, inode to join them.
-			if sysStat.Nlink < 2 {
-				dgst, err := hashPath(p)
-				if err != nil {
-					return err
-				}
-
+			for _, dgst := range r.Digests() {
 				entry.Digest = append(entry.Digest, dgst.String())
-			} else if sysStat.Nlink > 1 { // hard links
-				// Properties of hard links:
-				//	- nlinks > 1 (not all filesystems)
-				//	- identical dev and inode number for two files
-				//	- consider the file with the earlier ctime the "canonical" path
-				//
-				// How will this be done?
-				//	- check nlinks to detect hard links
-				//		-> add them to map by dev, inode
-				//	- hard links are represented by a single entry with multiple paths
-				//	- defer addition to entries until after all entries are seen
-				key := hardlinkKey{dev: sysStat.Dev, inode: sysStat.Ino}
-
-				// add the hardlink
-				hardlinks[key] = append(hardlinks[key], &entry)
-
-				// TODO(stevvooe): Possibly use os.SameFile here?
-
-				return nil // hardlinks are postprocessed, so we exit
 			}
+		case SymLink:
+			entry.Target = r.Target()
 		}
 
-		if fi.Mode()&os.ModeSymlink != 0 {
-			// We handle relative links vs absolute links by including a
-			// beginning slash for absolute links. Effectively, the bundle's
-			// root is treated as the absolute link anchor.
+		// enforce a few stability guarantees that may not be provided by the
+		// resource implementation.
+		sort.Strings(entry.Path)
+		sort.Stable(keyValuebyAttributeName(entry.Xattr))
 
-			target, err := os.Readlink(p)
-			if err != nil {
-				return err
-			}
-
-			if filepath.IsAbs(target) {
-				// When path is absolute, we make it relative to the bundle root.
-				target, err = filepath.Rel(root, target)
-				if err != nil {
-					return err
-				}
-
-				// now make the target absolute, since we want to maintain that.
-				target = filepath.Join("/", target)
-			} else {
-				// make sure the target is contained in the root.
-				real := filepath.Join(p, target)
-				if !strings.HasPrefix(real, root) {
-					return fmt.Errorf("link refers to file outside of root: %q -> %q", p, target)
-				}
-			}
-
-			entry.Target = target
-		}
-
-		if fi.Mode()&os.ModeNamedPipe != 0 {
-			// Everything needed to rebuild a pipe is included in the mode.
-		}
-
-		if fi.Mode()&os.ModeDevice != 0 {
-			// character and block devices merely need to recover the
-			// major/minor device number.
-			entry.Major = uint32(major(uint(sysStat.Rdev)))
-			entry.Minor = uint32(minor(uint(sysStat.Rdev)))
-		}
-
-		if fi.Mode()&os.ModeSocket != 0 {
-			return nil // sockets are skipped, no point
-		}
-
-		entriesByPath[p] = &entry
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	// process the groups of hardlinks
-	for pair, linked := range hardlinks {
-		if len(linked) < 1 {
-			return nil, fmt.Errorf("no hardlink entrys for dev, inode pair: %#v", pair)
-		}
-
-		// a canonical hardlink target is selected by sort position to ensure
-		// the same file will always be used as the link target.
-		sort.Sort(byPath(linked))
-
-		canonical, rest := linked[0], linked[1:]
-
-		dgst, err := hashPath(filepath.Join(root, canonical.Path[0]))
-		if err != nil {
-			return nil, err
-		}
-
-		// canonical gets appended like a regular file.
-		canonical.Digest = append(canonical.Digest, dgst.String())
-		entriesByPath[canonical.Path[0]] = canonical
-
-		// process the links.
-		for _, link := range rest {
-			// a hardlink is a regular file with a target instead of a digest.
-			// We can just set the target from the canonical path since
-			// hardlinks are alwas
-			canonical.Path = append(canonical.Path, link.Path...)
-		}
-
-		sort.Strings(canonical.Path)
-	}
-
-	var entries []*pb.Entry
-	for _, entry := range entriesByPath {
 		entries = append(entries, entry)
 	}
 
@@ -228,41 +117,14 @@ func ApplyManifest(root string, manifest *pb.Manifest) error {
 	panic("not implemented")
 }
 
-// sanitize and clean the path relative to root.
-func sanitize(root, p string) (string, error) {
-	sanitized, err := filepath.Rel(root, p)
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Clean(sanitized), nil
-}
-
-// hardlinkKey provides a tuple-key for managing hardlinks.
-type hardlinkKey struct {
-	dev   int32
-	inode uint64
-}
-
-func hashPath(p string) (digest.Digest, error) {
-	digester := digest.Canonical.New() // TODO(stevvooe): Make this configurable.
-
-	f, err := os.Open(p)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(digester.Hash(), f); err != nil {
-		return "", err
-	}
-
-	return digester.Digest(), nil
-
-}
-
 type byPath []*pb.Entry
 
 func (bp byPath) Len() int           { return len(bp) }
 func (bp byPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
 func (bp byPath) Less(i, j int) bool { return bp[i].Path[0] < bp[j].Path[0] } // sort by first path entry.
+
+type keyValuebyAttributeName []*pb.KeyValue
+
+func (bp keyValuebyAttributeName) Len() int           { return len(bp) }
+func (bp keyValuebyAttributeName) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
+func (bp keyValuebyAttributeName) Less(i, j int) bool { return bp[i].Name < bp[j].Name }

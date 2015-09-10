@@ -14,13 +14,19 @@ var DumpCmd = &cobra.Command{
 	Use:   "dump <manifest>",
 	Short: "Dump the contents of the manifest in protobuf text format",
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) != 1 {
-			log.Fatalln("please specify a manifest")
-		}
+		var p []byte
+		var err error
 
-		p, err := ioutil.ReadFile(args[0])
-		if err != nil {
-			log.Fatalf("error reading manifest: %v", err)
+		if len(args) < 1 {
+			p, err = ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatalf("error reading manifest: %v", err)
+			}
+		} else {
+			p, err = ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Fatalf("error reading manifest: %v", err)
+			}
 		}
 
 		var bm pb.Manifest
