@@ -22,7 +22,12 @@ var (
 				log.Fatalln("please specify a root")
 			}
 
-			m, err := continuity.BuildManifest(args[0], nil)
+			ctx, err := continuity.NewPathContext(args[0])
+			if err != nil {
+				log.Fatalf("error creating path context: %v", err)
+			}
+
+			m, err := continuity.BuildManifest(ctx)
 			if err != nil {
 				log.Fatalf("error generating manifest: %v", err)
 			}
