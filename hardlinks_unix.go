@@ -30,5 +30,5 @@ func newHardlinkKey(fi os.FileInfo) (hardlinkKey, error) {
 		return hardlinkKey{}, errNotAHardLink
 	}
 
-	return hardlinkKey{dev: sys.Dev, inode: sys.Ino}, nil
+	return hardlinkKey{dev: uint64(sys.Dev), inode: sys.Ino}, nil
 }

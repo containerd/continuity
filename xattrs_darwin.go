@@ -32,7 +32,7 @@ import (
 //
 // Once generated, these functions were manually dropped into this file.
 
-func getxattr(path string, attr string, dest []byte, flags int) (sz int, err error) {
+func getxattr(path string, attr string, dest []byte) (sz int, err error) {
 	var _p0 *byte
 	_p0, err = unix.BytePtrFromString(path)
 	if err != nil {
@@ -49,10 +49,7 @@ func getxattr(path string, attr string, dest []byte, flags int) (sz int, err err
 	} else {
 		_p2 = unsafe.Pointer(&_zero)
 	}
-
-	// NOTE(stevvooe): Done a little hacking here but I'm sure we are not
-	// getting this syscall correct on OS X. We are still following links.
-	r0, _, e1 := unix.Syscall6(unix.SYS_GETXATTR, uintptr(unsafe.Pointer(_p0)), uintptr(unsafe.Pointer(_p1)), uintptr(_p2), uintptr(len(dest)), 0, uintptr(flags))
+	r0, _, e1 := unix.Syscall6(unix.SYS_GETXATTR, uintptr(unsafe.Pointer(_p0)), uintptr(unsafe.Pointer(_p1)), uintptr(_p2), uintptr(len(dest)), 0, 0)
 	use(unsafe.Pointer(_p0))
 	use(unsafe.Pointer(_p1))
 	sz = int(r0)
