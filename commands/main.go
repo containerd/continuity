@@ -47,8 +47,9 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 )
 
 func init() {
-	MainCmd.AddCommand(ApplyCmd)
 	MainCmd.AddCommand(BuildCmd)
+	MainCmd.AddCommand(VerifyCmd)
+	MainCmd.AddCommand(ApplyCmd)
 	MainCmd.AddCommand(LSCmd)
 	MainCmd.AddCommand(StatsCmd)
 	MainCmd.AddCommand(DumpCmd)
