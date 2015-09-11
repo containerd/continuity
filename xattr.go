@@ -49,7 +49,7 @@ func Listxattr(path string) ([]string, error) {
 func Getxattr(path, attr string) ([]byte, error) {
 	var p []byte = make([]byte, defaultXattrBufferSize)
 	for {
-		n, err := getxattr(path, attr, p, XATTR_NOFOLLOW)
+		n, err := getxattr(path, attr, p)
 		if err != nil {
 			if errno, ok := err.(syscall.Errno); ok && errno == syscall.ERANGE {
 				p = make([]byte, len(p)*2) // this can't be ideal.
