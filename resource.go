@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/docker/distribution/digest"
+	pb "github.com/stevvooe/continuity/proto"
 )
 
 // TODO(stevvooe): A record based model, somewhat sketched out at the bottom
@@ -363,6 +364,41 @@ func (bp resourceByPath) Len() int           { return len(bp) }
 func (bp resourceByPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
 func (bp resourceByPath) Less(i, j int) bool { return bp[i].Path() < bp[j].Path() }
 
+// toProto converts a resource to a protobuf record. We'd like to push this
+// the individual types but we want to keep this all together during
+// prototyping.
+func toProto(resource Resource) *pb.Resource {
+	b := &pb.Resource{
+		Path: []string{resource.Path()},
+		Mode: uint32(resource.Mode()),
+		Uid:  resource.UID(),
+		Gid:  resource.GID(),
+	}
+
+	if xattrer, ok := resource.(XAttrer); ok {
+		b.Xattr = xattrer.XAttrs()
+	}
+
+	switch r := resource.(type) {
+	case RegularFile:
+		b.Path = r.Paths()
+		b.Size = uint64(r.Size())
+
+		for _, dgst := range r.Digests() {
+			b.Digest = append(b.Digest, dgst.String())
+		}
+	case SymLink:
+		b.Target = r.Target()
+	case Device:
+		b.Major, b.Minor = r.Major(), r.Minor()
+	}
+
+	// enforce a few stability guarantees that may not be provided by the
+	// resource implementation.
+	sort.Strings(b.Path)
+
+	return b
+}
 
 // NOTE(stevvooe): An alternative model that supports inline declaration.
 // Convenient for unit testing where inline declarations may be desirable but

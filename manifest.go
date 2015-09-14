@@ -63,34 +63,7 @@ func BuildManifest(ctx Context) (*pb.Manifest, error) {
 
 	var entries []*pb.Resource
 	for _, resource := range resourcesByPath {
-		entry := &pb.Resource{
-			Path: []string{resource.Path()},
-			Mode: uint32(resource.Mode()),
-			Uid:  resource.UID(),
-			Gid:  resource.GID(),
-		}
-
-		if xattrer, ok := resource.(XAttrer); ok {
-			entry.Xattr = xattrer.XAttrs()
-		}
-
-		switch r := resource.(type) {
-		case RegularFile:
-			entry.Path = r.Paths()
-			entry.Size = uint64(r.Size())
-
-			for _, dgst := range r.Digests() {
-				entry.Digest = append(entry.Digest, dgst.String())
-			}
-		case SymLink:
-			entry.Target = r.Target()
-		}
-
-		// enforce a few stability guarantees that may not be provided by the
-		// resource implementation.
-		sort.Strings(entry.Path)
-
-		entries = append(entries, entry)
+		entries = append(entries, toProto(resource))
 	}
 
 	sort.Sort(byPath(entries))
