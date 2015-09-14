@@ -22,7 +22,7 @@ var (
 				log.Fatalln("please specify a root")
 			}
 
-			ctx, err := continuity.NewPathContext(args[0])
+			ctx, err := continuity.NewContext(args[0])
 			if err != nil {
 				log.Fatalf("error creating path context: %v", err)
 			}
