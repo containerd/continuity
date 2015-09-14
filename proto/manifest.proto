@@ -54,10 +54,10 @@ message Resource {
     string target = 9;
 
     // Major specifies the major device number for charactor and block devices.
-    uint32 major = 10;
+    uint64 major = 10;
 
     // Minor specifies the minor device number for charactor and block devices.
-    uint32 minor = 11;
+    uint64 minor = 11;
 
     // TODO(stevvooe): The use of maps here may be problematic for
     // deterministic generation. Check out this comment:
