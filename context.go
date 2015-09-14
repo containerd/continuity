@@ -37,7 +37,7 @@ type context struct {
 }
 
 // NewContext returns a Context associated with root.
-func NewPathContext(root string) (Context, error) {
+func NewContext(root string) (Context, error) {
 	// normalize to absolute path
 	root, err := filepath.Abs(filepath.Clean(root))
 	if err != nil {
