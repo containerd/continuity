@@ -1,18 +1,28 @@
 package continuity
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 )
 
 // from /usr/include/sys/types.h
 
-func major(dev uint) int {
-	return int(uint(dev>>24) & 0xff)
+func getmajor(dev int32) uint64 {
+	return (uint64(dev) >> 24) & 0xff
 }
 
-func minor(dev uint) int {
-	return int(dev & 0xffffff)
+func getminor(dev int32) uint64 {
+	return uint64(dev) & 0xffffff
+}
+
+func deviceInfo(fi os.FileInfo) (uint64, uint64, error) {
+	sys, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, 0, fmt.Errorf("cannot extract device from os.FileInfo")
+	}
+
+	return getmajor(sys.Rdev), getminor(sys.Rdev), nil
 }
 
 func makedev(major int, minor int) int {

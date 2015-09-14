@@ -156,7 +156,12 @@ type NamedPipe interface {
 	Pipe()
 }
 
+type Device interface {
+	Resource
 
+	Major() uint64
+	Minor() uint64
+}
 
 type resource struct {
 	paths    []string
@@ -325,12 +330,31 @@ func newNamedPipe(p string, fi os.FileInfo, base *resource) (NamedPipe, error) {
 
 func (np *namedPipe) Pipe() {}
 
-type resourceCharDevice struct {
-	Major, Minor int
+type device struct {
+	resource
+	major, minor uint64
 }
 
-type resourceBlockDevice struct {
-	Major, Minor int
+var _ Device = &device{}
+
+func newDevice(p string, fi os.FileInfo, base *resource, major, minor uint64) (Device, error) {
+	if fi.Mode()&os.ModeDevice == 0 {
+		return nil, fmt.Errorf("not a device")
+	}
+
+	return &device{
+		resource: *base,
+		major:    major,
+		minor:    minor,
+	}, nil
+}
+
+func (d device) Major() uint64 {
+	return d.major
+}
+
+func (d device) Minor() uint64 {
+	return d.minor
 }
 
 type resourceByPath []Resource

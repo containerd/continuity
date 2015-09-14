@@ -166,19 +166,16 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		return newNamedPipe(p, fi, base)
 	}
 
-	// TODO(stevvooe): Implement support for devices and make a note about
-	// socket support. The below was lifted from the refactored BuildManifest.
+	if fi.Mode()&os.ModeDevice != 0 {
+		// character and block devices merely need to recover the
+		// major/minor device number.
+		major, minor, err := deviceInfo(fi)
+		if err != nil {
+			return nil, err
+		}
 
-	// if fi.Mode()&os.ModeDevice != 0 {
-	// 	// character and block devices merely need to recover the
-	// 	// major/minor device number.
-	// 	entry.Major = uint32(major(uint(sysStat.Rdev)))
-	// 	entry.Minor = uint32(minor(uint(sysStat.Rdev)))
-	// }
-
-	// if fi.Mode()&os.ModeSocket != 0 {
-	// 	return nil // sockets are skipped, no point
-	// }
+		return newDevice(p, fi, base, major, minor)
+	}
 
 	log.Printf("%q (%v) is not supported", fp, fi.Mode())
 	return nil, ErrNotFound
