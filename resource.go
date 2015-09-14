@@ -156,34 +156,7 @@ type NamedPipe interface {
 	Pipe()
 }
 
-// uniqifyDigests sorts and uniqifies the provided digest, ensuring that the
-// digests are not repeated and no two digests with the same algorithm have
-// different values. Because a stable sort is used, this has the effect of
-// "zipping" digest collections from multiple resources.
-func uniqifyDigests(digests ...digest.Digest) ([]digest.Digest, error) {
-	sort.Stable(digestSlice(digests)) // stable sort is important for the behavior here.
-	seen := map[digest.Digest]struct{}{}
-	algs := map[digest.Algorithm][]digest.Digest{} // detect different digests.
 
-	var out []digest.Digest
-	// uniqify the digests
-	for _, d := range digests {
-		if _, ok := seen[d]; ok {
-			continue
-		}
-
-		seen[d] = struct{}{}
-		algs[d.Algorithm()] = append(algs[d.Algorithm()], d)
-
-		if len(algs[d.Algorithm()]) > 1 {
-			return nil, fmt.Errorf("conflicting digests for %v found", d.Algorithm())
-		}
-
-		out = append(out, d)
-	}
-
-	return out, nil
-}
 
 type resource struct {
 	paths    []string
@@ -366,11 +339,6 @@ func (bp resourceByPath) Len() int           { return len(bp) }
 func (bp resourceByPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
 func (bp resourceByPath) Less(i, j int) bool { return bp[i].Path() < bp[j].Path() }
 
-type digestSlice []digest.Digest
-
-func (p digestSlice) Len() int           { return len(p) }
-func (p digestSlice) Less(i, j int) bool { return p[i] < p[j] }
-func (p digestSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // NOTE(stevvooe): An alternative model that supports inline declaration.
 // Convenient for unit testing where inline declarations may be desirable but

@@ -61,8 +61,8 @@ type Resource struct {
 	Size uint64 `protobuf:"varint,7,opt,name=size" json:"size,omitempty"`
 	// Digest specifies the content digest of the target file. Only valid for
 	// regular files. The strings are formatted as <alg>:<digest hex bytes>.
-	// The digests are added in order of precedence favored by the
-	// generating party.
+	// The digests are sorted in lexical order and implementations may choose
+	// which algorithms they prefer.
 	Digest []string `protobuf:"bytes,8,rep,name=digest" json:"digest,omitempty"`
 	// Target defines the target of a hard or soft link. Absolute links start
 	// with a slash and specify the resource relative to the bundle root.
