@@ -16,10 +16,17 @@ var (
 	ErrNotFound = fmt.Errorf("not found")
 )
 
-// Context represents a file system context for accessing resources.
+type Context interface {
+	Verify(Resource) error
+	Resource(string, os.FileInfo) (Resource, error)
+	Sanitize(string) (string, error)
+	Walk(filepath.WalkFunc) error
+}
+
+// context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
-type Context struct {
+type context struct {
 	root string
 
 	// TODO(stevvooe): Define a "context driver" type that can be used to
@@ -30,7 +37,7 @@ type Context struct {
 }
 
 // NewContext returns a Context associated with root.
-func NewContext(root string) (*Context, error) {
+func NewPathContext(root string) (Context, error) {
 	// normalize to absolute path
 	root, err := filepath.Abs(filepath.Clean(root))
 	if err != nil {
@@ -50,20 +57,20 @@ func NewContext(root string) (*Context, error) {
 		return nil, &os.PathError{Op: "NewContext", Path: root, Err: os.ErrInvalid}
 	}
 
-	return &Context{root: root}, nil
+	return &context{root: root}, nil
 }
 
 // Sanitize validates that the path p points to a resource inside the context
 // and sanitizes it. If the path cannot be sanitized or points outside of the
 // context, an error is returned.
 // TODO(stevvooe): This method name needs to be changed.
-func (c *Context) Sanitize(p string) (string, error) {
+func (c *context) Sanitize(p string) (string, error) {
 	return sanitize(c.root, p)
 }
 
 // Path returns the full path of p within the context. If the path escapes the
 // context root, an error is returned.
-func (c *Context) Path(p string) (string, error) {
+func (c *context) Path(p string) (string, error) {
 	p = filepath.Join(c.root, p)
 	if !strings.HasPrefix(p, c.root) {
 		return "", fmt.Errorf("invalid context path")
@@ -73,7 +80,7 @@ func (c *Context) Path(p string) (string, error) {
 }
 
 // Digest returns the digest of the file at path p, relative to the root.
-func (c *Context) Digest(p string) (digest.Digest, error) {
+func (c *context) Digest(p string) (digest.Digest, error) {
 	return digestPath(filepath.Join(c.root, p))
 }
 
@@ -81,7 +88,7 @@ func (c *Context) Digest(p string) (digest.Digest, error) {
 // from fi. The path p should be the path of the resource in the context,
 // typically obtained from a call to Sanitize or the value of Resource.Path().
 // If fi is nil, os.Lstat will be used resolve it.
-func (c *Context) Resource(p string, fi os.FileInfo) (Resource, error) {
+func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	fp, err := c.Path(p)
 	if err != nil {
 		return nil, err
@@ -179,27 +186,27 @@ func (c *Context) Resource(p string, fi os.FileInfo) (Resource, error) {
 
 // Verify the resource in the context. An error will be returned a discrepancy
 // is found.
-func (c *Context) Verify(resource Resource) error {
+func (c *context) Verify(resource Resource) error {
 	panic("not implemented")
 }
 
 // Apply the resource to the contexts. An error will be returned in the
 // operation fails. Depending on the resource type, the resource may be
 // created. For resource that cannot be resolved, an error will be returned.
-func (c *Context) Apply(resource Resource) error {
+func (c *context) Apply(resource Resource) error {
 	panic("not implemented")
 }
 
 // Walk provides a convenience function to call filepath.Walk correctly for
 // the context. The behavior is otherwise identical.
-func (c *Context) Walk(fn filepath.WalkFunc) error {
+func (c *context) Walk(fn filepath.WalkFunc) error {
 	return filepath.Walk(c.root, fn)
 }
 
 // resolveXAttrs attempts to resolve the extended attributes for the resource
 // at the path fp, which is the full path to the resource. If the resource
 // cannot have xattrs, nil will be returned.
-func (c *Context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[string][]byte, error) {
+func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[string][]byte, error) {
 	// Restricts xattrs to only the below file types. This allowance of
 	// symlinks is slightly questionable, since their support is spotty on
 	// most file systems and xattrs are generally stored in the inode. This

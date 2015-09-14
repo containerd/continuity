@@ -1,36 +1,29 @@
 package continuity
 
 import (
-	"log"
 	"os"
-	"path/filepath"
 	"sort"
 
 	pb "github.com/stevvooe/continuity/proto"
 )
 
-// BuildManifest creates the manifest for the root directory. includeFn should
-// return nil for files that should be included in the manifest. The function
-// is called with the unmodified arguments of filepath.Walk.
-func BuildManifest(root string, includeFn filepath.WalkFunc) (*pb.Manifest, error) {
-	ctx, err := NewContext(root)
-	if err != nil {
-		log.Println("error creating context")
-		return nil, err
-	}
-
+// BuildManifest creates the manifest for the given context
+func BuildManifest(ctx Context) (*pb.Manifest, error) {
 	resourcesByPath := map[string]Resource{}
 	hardlinks := newHardlinkManager()
 
 	if err := ctx.Walk(func(p string, fi os.FileInfo, err error) error {
-		if p == ctx.root {
-			// skip the root
-			return nil
+		if err != nil {
+			return err
 		}
 
 		sanitized, err := ctx.Sanitize(p)
 		if err != nil {
 			return err
+		}
+		if sanitized == "." {
+			// skip the root
+			return nil
 		}
 
 		resource, err := ctx.Resource(sanitized, fi)
