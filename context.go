@@ -2,7 +2,6 @@ package continuity
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,10 +16,12 @@ var (
 )
 
 type Context interface {
+	Apply(Resource) error
 	Verify(Resource) error
 	Resource(string, os.FileInfo) (Resource, error)
 	Sanitize(string) (string, error)
 	Walk(filepath.WalkFunc) error
+	Digest(string) (digest.Digest, error)
 }
 
 // context represents a file system context for accessing resources.
@@ -94,7 +95,6 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		return nil, err
 	}
 
-	log.Println("resource", p, fp)
 	if fi == nil {
 		fi, err = os.Lstat(fp)
 		if err != nil {
