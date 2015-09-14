@@ -128,7 +128,12 @@ func TestWalkFS(t *testing.T) {
 
 	generateTestFiles(t, root, testResources)
 
-	bm, err := BuildManifest(root, nil)
+	ctx, err := NewContext(root)
+	if err != nil {
+		t.Fatalf("error getting context: %v", err)
+	}
+
+	bm, err := BuildManifest(ctx)
 	if err != nil {
 		t.Fatalf("error building manifest: %v, %#T", err, err)
 	}
