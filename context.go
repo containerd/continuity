@@ -5,42 +5,45 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/docker/distribution/digest"
 )
 
 var (
-	ErrNotFound = fmt.Errorf("not found")
+	ErrNotFound     = fmt.Errorf("not found")
+	ErrNotSupported = fmt.Errorf("not supported")
 )
 
+// Context represents a file system context for accessing resources. The
+// responsibility of the context is to convert system specific resources to
+// generic Resource objects. Most of this is safe path manipulation, as well
+// as extraction of resource details.
 type Context interface {
 	Apply(Resource) error
 	Verify(Resource) error
 	Resource(string, os.FileInfo) (Resource, error)
-	Sanitize(string) (string, error)
 	Walk(filepath.WalkFunc) error
-	Digest(string) (digest.Digest, error)
 }
 
 // context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	root string
-
-	// TODO(stevvooe): Define a "context driver" type that can be used to
-	// switch out the backing context implementation. This should handle
-	// paths, digesting files, opening files, resolving system specific
-	// attributes in addition to being a place where we can isolate system
-	// specific operations.
+	driver Driver
+	root   string
 }
 
-// NewContext returns a Context associated with root.
+// NewContext returns a Context associated with root. The default driver will
+// be used, as returned by NewDriver.
 func NewContext(root string) (Context, error) {
 	// normalize to absolute path
 	root, err := filepath.Abs(filepath.Clean(root))
+	if err != nil {
+		return nil, err
+	}
+
+	driver, err := NewSystemDriver()
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +52,7 @@ func NewContext(root string) (Context, error) {
 	// allowing a link for now, but this may have odd behavior when
 	// canonicalizing paths. As long as all files are opened through the link
 	// path, this should be okay.
-	fi, err := os.Stat(root)
+	fi, err := driver.Stat(root)
 	if err != nil {
 		return nil, err
 	}
@@ -58,45 +61,21 @@ func NewContext(root string) (Context, error) {
 		return nil, &os.PathError{Op: "NewContext", Path: root, Err: os.ErrInvalid}
 	}
 
-	return &context{root: root}, nil
-}
-
-// Sanitize validates that the path p points to a resource inside the context
-// and sanitizes it. If the path cannot be sanitized or points outside of the
-// context, an error is returned.
-// TODO(stevvooe): This method name needs to be changed.
-func (c *context) Sanitize(p string) (string, error) {
-	return sanitize(c.root, p)
-}
-
-// Path returns the full path of p within the context. If the path escapes the
-// context root, an error is returned.
-func (c *context) Path(p string) (string, error) {
-	p = filepath.Join(c.root, p)
-	if !strings.HasPrefix(p, c.root) {
-		return "", fmt.Errorf("invalid context path")
-	}
-
-	return p, nil
-}
-
-// Digest returns the digest of the file at path p, relative to the root.
-func (c *context) Digest(p string) (digest.Digest, error) {
-	return digestPath(filepath.Join(c.root, p))
+	return &context{root: root, driver: driver}, nil
 }
 
 // Resource returns the resource as path p, populating the entry with info
 // from fi. The path p should be the path of the resource in the context,
-// typically obtained from a call to Sanitize or the value of Resource.Path().
-// If fi is nil, os.Lstat will be used resolve it.
+// typically obtained through Walk or from the value of Resource.Path(). If fi
+// is nil, it will be resolved.
 func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
-	fp, err := c.Path(p)
+	fp, err := c.fullpath(p)
 	if err != nil {
 		return nil, err
 	}
 
 	if fi == nil {
-		fi, err = os.Lstat(fp)
+		fi, err = c.driver.Lstat(fp)
 		if err != nil {
 			return nil, err
 		}
@@ -108,14 +87,16 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	base.xattrs, err = c.resolveXAttrs(fp, fi, base)
-	if err != nil {
+	if err == ErrNotSupported {
+		log.Printf("resolving xattrs on %s not supported", fp)
+	} else if err != nil {
 		return nil, err
 	}
 
 	// TODO(stevvooe): Handle windows alternate data streams.
 
 	if fi.Mode().IsRegular() {
-		dgst, err := digestPath(fp)
+		dgst, err := c.digest(p)
 		if err != nil {
 			return nil, err
 		}
@@ -131,31 +112,23 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		// We handle relative links vs absolute links by including a
 		// beginning slash for absolute links. Effectively, the bundle's
 		// root is treated as the absolute link anchor.
-		target, err := os.Readlink(fp)
+		target, err := c.driver.Readlink(fp)
 		if err != nil {
 			return nil, err
 		}
 
-		// TODO(stevvooe): Re-do this when we have fully vetted path
-		// management methods on context.
 		if filepath.IsAbs(target) {
-
-			// TODO(stevvooe): This path needs to be "sanitized" (or contained
-			// or whatever we end up calling it).
-
-			// When path is absolute, we make it relative to the bundle root.
-			target, err = filepath.Rel(c.root, target)
+			// contain the absolute path to the context root.
+			target, err = c.contain(p)
 			if err != nil {
 				return nil, err
 			}
-
-			// now make the target absolute, since we want to maintain that.
-			target = filepath.Join("/", target)
 		} else {
-			// make sure the target is contained in the root.
+			// make sure the target is contained in the root by evaluating the
+			// link and checking the prefix.
 			real := filepath.Join(fp, target)
 			if !strings.HasPrefix(real, c.root) {
-				return nil, fmt.Errorf("link refers to file outside of root: %q -> %q, real = %q", fp, target, real)
+				return nil, fmt.Errorf("uncontained symlink: %q -> %q, real = %q", fp, target, real)
 			}
 		}
 
@@ -167,9 +140,15 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	if fi.Mode()&os.ModeDevice != 0 {
+		deviceDriver, ok := c.driver.(DeviceInfoDriver)
+		if !ok {
+			log.Printf("device extraction not supported %s", fp)
+			return nil, ErrNotSupported
+		}
+
 		// character and block devices merely need to recover the
 		// major/minor device number.
-		major, minor, err := deviceInfo(fi)
+		major, minor, err := deviceDriver.DeviceInfo(fi)
 		if err != nil {
 			return nil, err
 		}
@@ -195,56 +174,67 @@ func (c *context) Apply(resource Resource) error {
 }
 
 // Walk provides a convenience function to call filepath.Walk correctly for
-// the context. The behavior is otherwise identical.
+// the context. Otherwise identical to filepath.Walk, the path argument is
+// corrected to be contained within the context.
 func (c *context) Walk(fn filepath.WalkFunc) error {
-	return filepath.Walk(c.root, fn)
+	return filepath.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
+		contained, err := c.contain(p)
+		return fn(contained, fi, err)
+	})
+}
+
+// fullpath returns the system path for the resource, joined with the context
+// root. The path p must be a part of the context.
+func (c *context) fullpath(p string) (string, error) {
+	p = filepath.Join(c.root, p)
+	if !strings.HasPrefix(p, c.root) {
+		return "", fmt.Errorf("invalid context path")
+	}
+
+	return p, nil
+}
+
+// contain cleans and santizes the filesystem path p to be an absolute path,
+// effectively relative to the context root.
+func (c *context) contain(p string) (string, error) {
+	sanitized, err := filepath.Rel(c.root, p)
+	if err != nil {
+		return "", err
+	}
+
+	// ZOMBIES(stevvooe): In certain cases, we may want to remap these to a
+	// "containment error", so the caller can decide what to do.
+	return filepath.Join("/", filepath.Clean(sanitized)), nil
+}
+
+// digest returns the digest of the file at path p, relative to the root.
+func (c *context) digest(p string) (digest.Digest, error) {
+	return digestPath(c.driver, filepath.Join(c.root, p))
 }
 
 // resolveXAttrs attempts to resolve the extended attributes for the resource
 // at the path fp, which is the full path to the resource. If the resource
 // cannot have xattrs, nil will be returned.
 func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[string][]byte, error) {
-	// Restricts xattrs to only the below file types. This allowance of
-	// symlinks is slightly questionable, since their support is spotty on
-	// most file systems and xattrs are generally stored in the inode. This
-	// may belong elsewhere.
-	if !(fi.Mode().IsRegular() || fi.Mode().IsDir()) {
-		return nil, nil
-	}
-
-	// TODO(stevvooe): This is very preliminary support for xattrs. We
-	// still need to ensure that links aren't being followed.
-	xattrs, err := Listxattr(fp)
-	if err != nil {
-		log.Println("error listing xattrs ", fp)
-		return nil, err
-	}
-
-	sort.Strings(xattrs)
-	m := make(map[string][]byte, len(xattrs))
-
-	for _, attr := range xattrs {
-		value, err := Getxattr(fp, attr)
-		if err != nil {
-			log.Printf("error getting xattrs: %v %q %v %v", fp, attr, xattrs, len(xattrs))
-			return nil, err
+	if fi.Mode().IsRegular() || fi.Mode().IsDir() {
+		xattrDriver, ok := c.driver.(XAttrDriver)
+		if !ok {
+			log.Println("xattr extraction not supported")
+			return nil, ErrNotSupported
 		}
 
-		// NOTE(stevvooe): This append/copy tricky relies on unique
-		// xattrs. Break this out into an alloc/copy if xattrs are no
-		// longer unique.
-		m[attr] = append(base.xattrs[attr], value...)
+		return xattrDriver.Getxattr(fp)
 	}
 
-	return m, nil
-}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		lxattrDriver, ok := c.driver.(LXAttrDriver)
+		if !ok {
+			log.Println("xattr extraction for symlinks not supported")
+			return nil, ErrNotSupported
+		}
 
-// sanitize and clean the path relative to root.
-func sanitize(root, p string) (string, error) {
-	sanitized, err := filepath.Rel(root, p)
-	if err != nil {
-		return "", err
+		return lxattrDriver.LGetxattr(fp)
 	}
 
-	return filepath.Join("/", filepath.Clean(sanitized)), nil
+	return nil, nil
 }

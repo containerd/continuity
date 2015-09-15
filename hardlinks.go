@@ -21,7 +21,7 @@ func newHardlinkManager() *hardlinkManager {
 
 // Add attempts to add the resource to the hardlink manager. If the resource
 // cannot be considered as a hardlink candidate, errNotAHardLink is returned.
-func (hlm *hardlinkManager) Add(p string, fi os.FileInfo, resource Resource) error {
+func (hlm *hardlinkManager) Add(fi os.FileInfo, resource Resource) error {
 	if !fi.Mode().IsRegular() {
 		return errNotAHardLink
 	}

@@ -1,6 +1,8 @@
 package continuity
 
 import (
+	"fmt"
+	"log"
 	"os"
 	"sort"
 
@@ -14,34 +16,31 @@ func BuildManifest(ctx Context) (*pb.Manifest, error) {
 
 	if err := ctx.Walk(func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("error walking %s: %v", p, err)
 		}
 
-		sanitized, err := ctx.Sanitize(p)
-		if err != nil {
-			return err
-		}
-		if sanitized == "." {
-			// skip the root
+		if p == "/" {
+			// skip root
 			return nil
 		}
 
-		resource, err := ctx.Resource(sanitized, fi)
+		resource, err := ctx.Resource(p, fi)
 		if err != nil {
 			if err == ErrNotFound {
 				return nil
 			}
+			log.Printf("error getting resource %q: %v", p, err)
 			return err
 		}
 
 		// add to the hardlink manager
-		if err := hardlinks.Add(p, fi, resource); err == nil {
+		if err := hardlinks.Add(fi, resource); err == nil {
 			// Resource has been accepted by hardlink manager so we don't add
 			// it to the resourcesByPath until we merge at the end.
 			return nil
 		} else if err != errNotAHardLink {
 			// handle any other case where we have a proper error.
-			return err
+			return fmt.Errorf("adding hardlink %s: %v", p, err)
 		}
 
 		resourcesByPath[p] = resource
@@ -73,7 +72,11 @@ func BuildManifest(ctx Context) (*pb.Manifest, error) {
 	}, nil
 }
 
-func ApplyManifest(root string, manifest *pb.Manifest) error {
+func VerifyManifest(ctx Context, manifest *pb.Manifest) error {
+	panic("not implemented")
+}
+
+func ApplyManifest(ctx Context, manifest *pb.Manifest) error {
 	panic("not implemented")
 }
 

@@ -3,7 +3,6 @@ package continuity
 import (
 	"fmt"
 	"io"
-	"os"
 	"sort"
 
 	"github.com/docker/distribution/digest"
@@ -11,10 +10,10 @@ import (
 
 // digestPath returns the digest of the file at path p. Currently, this only
 // uses the value of digest.Canonical to resolve the hash to use.
-func digestPath(p string) (digest.Digest, error) {
+func digestPath(d Driver, p string) (digest.Digest, error) {
 	digester := digest.Canonical.New() // TODO(stevvooe): Make this configurable.
 
-	f, err := os.Open(p)
+	f, err := d.Open(p)
 	if err != nil {
 		return "", err
 	}
