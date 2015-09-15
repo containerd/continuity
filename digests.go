@@ -55,6 +55,26 @@ func uniqifyDigests(digests ...digest.Digest) ([]digest.Digest, error) {
 	return out, nil
 }
 
+// digestsMatch compares the two sets of digests to see if they match.
+func digestsMatch(as, bs []digest.Digest) bool {
+	all := append(as, bs...)
+
+	uniqified, err := uniqifyDigests(all...)
+	if err != nil {
+		// the only error uniqifyDigests returns is when the digests disagree.
+		return false
+	}
+
+	disjoint := len(as) + len(bs)
+	if len(uniqified) == disjoint {
+		// if these two sets have the same cardinality, we know both sides
+		// didn't share any digests.
+		return false
+	}
+
+	return true
+}
+
 type digestSlice []digest.Digest
 
 func (p digestSlice) Len() int           { return len(p) }

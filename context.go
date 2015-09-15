@@ -1,6 +1,7 @@
 package continuity
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -176,7 +177,94 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 // Verify the resource in the context. An error will be returned a discrepancy
 // is found.
 func (c *context) Verify(resource Resource) error {
-	panic("not implemented")
+	target, err := c.Resource(resource.Path(), nil)
+	if err != nil {
+		return err
+	}
+
+	if target.Path() != resource.Path() {
+		return fmt.Errorf("resource paths do not match: %q != %q", target.Path(), resource.Path())
+	}
+
+	if target.Mode() != resource.Mode() {
+		return fmt.Errorf("resource %q has incorrect mode: %v != %v", target.Path(), target.Mode(), resource.Mode())
+	}
+
+	if target.UID() != resource.UID() {
+		return fmt.Errorf("unexpected uid for %q: %v != %v", target.Path(), target.UID(), resource.GID())
+	}
+
+	if target.GID() != resource.GID() {
+		return fmt.Errorf("unexpected gid for %q: %v != %v", target.Path(), target.GID(), target.GID())
+	}
+
+	if xattrer, ok := resource.(XAttrer); ok {
+		txattrer, tok := target.(XAttrer)
+		if !tok {
+			return fmt.Errorf("resource %q has xattrs but target does not support them", resource.Path())
+		}
+
+		// For xattrs, only ensure that we have those defined in the resource
+		// and their values match. We can ignore other xattrs. In other words,
+		// we only verify that target has the subset defined by resource.
+		txattrs := txattrer.XAttrs()
+		for attr, value := range xattrer.XAttrs() {
+			tvalue, ok := txattrs[attr]
+			if !ok {
+				return fmt.Errorf("resource %q target missing xattr %q", resource.Path(), attr)
+			}
+
+			if !bytes.Equal(value, tvalue) {
+				return fmt.Errorf("xattr %q value differs for resource %q", attr, resource.Path())
+			}
+		}
+	}
+
+	switch r := resource.(type) {
+	case RegularFile:
+		// TODO(stevvooe): We need to grab a target for each path, since a
+		// regular file may be a hardlink. Effectively, we must use t.Paths()
+		// somewhere in here.
+		if len(r.Paths()) > 1 {
+			panic("not implemented")
+		}
+
+		// TODO(stevvooe): Another reason to use a record-based approach. We
+		// have to do another type switch to get this to work. This could be
+		// fixed with an Equal function, but let's study this a little more to
+		// be sure.
+		t, ok := target.(RegularFile)
+		if !ok {
+			return fmt.Errorf("resource %q target not a regular file", r.Path())
+		}
+
+		if t.Size() != r.Size() {
+			return fmt.Errorf("resource %q target has incorrect size: %v != %v", t.Path(), t.Size(), r.Size())
+		}
+
+		// TODO(stevvooe): This may need to get a little more sophisticated
+		// for digest comparison. We may want to actually calculate the
+		// provided digests, rather than the implementations having an
+		// overlap.
+		if !digestsMatch(t.Digests(), r.Digests()) {
+			return fmt.Errorf("digests for resource %q do not match: %v != %v", t.Path(), t.Digests(), r.Digests())
+		}
+	case Directory:
+		// nothing to be done here.
+	case SymLink:
+		t, ok := target.(SymLink)
+		if !ok {
+			return fmt.Errorf("resource %q target not a symlink: %v", t)
+		}
+
+		if t.Target() != r.Target() {
+			return fmt.Errorf("resource %q target has mismatched target: %q != %q", t.Target(), r.Target())
+		}
+	default:
+		return fmt.Errorf("cannot verify resource: %v", resource)
+	}
+
+	return nil
 }
 
 // Apply the resource to the contexts. An error will be returned in the
