@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/docker/distribution/digest"
 )
@@ -81,7 +82,19 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		}
 	}
 
-	base, err := newBaseResource(p, fi)
+	// TODO(stevvooe): This need to be resolved for the container's root,
+	// where here we are really getting the host OS's value. We need to allow
+	// this be passed in and fixed up to make these uid/gid mappings portable.
+	// Either this can be part of the driver or we can achieve it through some
+	// other mechanism.
+	sys, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		// TODO(stevvooe): This may not be a hard error for all platforms. We
+		// may want to move this to the driver.
+		return nil, fmt.Errorf("unable to resolve syscall.Stat_t from (os.FileInfo).Sys(): %#v", fi)
+	}
+
+	base, err := newBaseResource(p, fi.Mode(), fmt.Sprint(sys.Uid), fmt.Sprint(sys.Gid))
 	if err != nil {
 		return nil, err
 	}
@@ -101,11 +114,11 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 			return nil, err
 		}
 
-		return newRegularFile(p, fi, base, dgst)
+		return newRegularFile(base, base.paths, fi.Size(), dgst)
 	}
 
 	if fi.Mode().IsDir() {
-		return newDirectory(p, fi, base)
+		return newDirectory(base)
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 {
@@ -132,11 +145,11 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 			}
 		}
 
-		return newSymLink(p, fi, base, target)
+		return newSymLink(base, target)
 	}
 
 	if fi.Mode()&os.ModeNamedPipe != 0 {
-		return newNamedPipe(p, fi, base)
+		return newNamedPipe(base)
 	}
 
 	if fi.Mode()&os.ModeDevice != 0 {
@@ -153,7 +166,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 			return nil, err
 		}
 
-		return newDevice(p, fi, base, major, minor)
+		return newDevice(base, major, minor)
 	}
 
 	log.Printf("%q (%v) is not supported", fp, fi.Mode())

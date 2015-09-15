@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 	"github.com/stevvooe/continuity"
 )
@@ -32,12 +31,14 @@ var (
 				log.Fatalf("error generating manifest: %v", err)
 			}
 
-			p, err := proto.Marshal(m)
+			p, err := continuity.Marshal(m)
 			if err != nil {
-				log.Fatalf("error marshing manifest: %v", err)
+				log.Fatalf("error marshaling manifest: %v", err)
 			}
 
-			os.Stdout.Write(p)
+			if _, err := os.Stdout.Write(p); err != nil {
+				log.Fatalf("error writing to stdout: %v", err)
+			}
 		},
 	}
 )

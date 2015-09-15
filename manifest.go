@@ -2,15 +2,62 @@ package continuity
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sort"
 
+	"github.com/golang/protobuf/proto"
 	pb "github.com/stevvooe/continuity/proto"
 )
 
+// Manifest provides the contents of a manifest. Users of this struct should
+// not typically modify any fields directly.
+type Manifest struct {
+	// Resources specifies all the resources for a manifest in order by path.
+	Resources []Resource
+}
+
+func Unmarshal(p []byte) (*Manifest, error) {
+	var bm pb.Manifest
+
+	if err := proto.Unmarshal(p, &bm); err != nil {
+		return nil, err
+	}
+
+	var m Manifest
+	for _, b := range bm.Resource {
+		r, err := fromProto(b)
+		if err != nil {
+			return nil, err
+		}
+
+		m.Resources = append(m.Resources, r)
+	}
+
+	return &m, nil
+}
+
+func Marshal(m *Manifest) ([]byte, error) {
+	var bm pb.Manifest
+	for _, resource := range m.Resources {
+		bm.Resource = append(bm.Resource, toProto(resource))
+	}
+
+	return proto.Marshal(&bm)
+}
+
+func MarshalText(w io.Writer, m *Manifest) error {
+	var bm pb.Manifest
+	for _, resource := range m.Resources {
+		bm.Resource = append(bm.Resource, toProto(resource))
+	}
+
+	return proto.MarshalText(w, &bm)
+}
+
 // BuildManifest creates the manifest for the given context
-func BuildManifest(ctx Context) (*pb.Manifest, error) {
+func BuildManifest(ctx Context) (*Manifest, error) {
 	resourcesByPath := map[string]Resource{}
 	hardlinks := newHardlinkManager()
 
@@ -60,28 +107,28 @@ func BuildManifest(ctx Context) (*pb.Manifest, error) {
 		resourcesByPath[resource.Path()] = resource
 	}
 
-	var entries []*pb.Resource
+	var resources []Resource
 	for _, resource := range resourcesByPath {
-		entries = append(entries, toProto(resource))
+		resources = append(resources, resource)
 	}
 
-	sort.Sort(byPath(entries))
+	sort.Stable(ByPath(resources))
 
-	return &pb.Manifest{
-		Resource: entries,
+	return &Manifest{
+		Resources: resources,
 	}, nil
 }
 
-func VerifyManifest(ctx Context, manifest *pb.Manifest) error {
-	panic("not implemented")
+func VerifyManifest(ctx Context, manifest *Manifest) error {
+	for _, resource := range manifest.Resources {
+		if err := ctx.Verify(resource); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ApplyManifest(ctx Context, manifest *pb.Manifest) error {
 	panic("not implemented")
 }
-
-type byPath []*pb.Resource
-
-func (bp byPath) Len() int           { return len(bp) }
-func (bp byPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
-func (bp byPath) Less(i, j int) bool { return bp[i].Path[0] < bp[j].Path[0] } // sort by first path entry.

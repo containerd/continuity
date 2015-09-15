@@ -5,14 +5,16 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"syscall"
 
 	"github.com/docker/distribution/digest"
 	pb "github.com/stevvooe/continuity/proto"
 )
 
 // TODO(stevvooe): A record based model, somewhat sketched out at the bottom
-// of this file, will be more flexible.
+// of this file, will be more flexible. Another possibly is to tie the package
+// interface directly to the protobuf type. This will have efficiency
+// advantages at the cost coupling the nasty codegen types to the exported
+// interface.
 
 type Resource interface {
 	// Path provides the primary resource path relative to the bundle root. In
@@ -26,6 +28,14 @@ type Resource interface {
 	UID() string
 	GID() string
 }
+
+// ByPath provides the canonical sort order for a set of resources. Use with
+// sort.Stable for deterministic sorting.
+type ByPath []Resource
+
+func (bp ByPath) Len() int           { return len(bp) }
+func (bp ByPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
+func (bp ByPath) Less(i, j int) bool { return bp[i].Path() < bp[j].Path() }
 
 type XAttrer interface {
 	XAttrs() map[string][]byte
@@ -175,23 +185,13 @@ var _ Resource = &resource{}
 
 // newBaseResource returns a *resource, populated with data from p and fi,
 // where p will be populated directly.
-func newBaseResource(p string, fi os.FileInfo) (*resource, error) {
-	sys, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		// TODO(stevvooe): This may not be a hard error for all platforms.
-		return nil, fmt.Errorf("unable to resolve syscall.Stat_t from (os.FileInfo).Sys(): %#v", fi)
-	}
-
+func newBaseResource(p string, mode os.FileMode, uid, gid string) (*resource, error) {
 	return &resource{
 		paths: []string{p},
-		mode:  fi.Mode(),
+		mode:  mode,
 
-		// TODO(stevvooe): This need to be resolved for the container's root,
-		// where here we are really getting the host OS's value. We need to
-		// allow this be passed in and fixed up to make these uid/gid mappings
-		// portable.
-		uid: fmt.Sprint(sys.Uid),
-		gid: fmt.Sprint(sys.Gid),
+		uid: uid,
+		gid: gid,
 
 		// NOTE(stevvooe): Population of shared xattrs field is deferred to
 		// the resource types that populate it. Since they are a property of
@@ -229,18 +229,21 @@ var _ RegularFile = &regularFile{}
 
 // newRegularFile returns the RegularFile, using the populated base resource
 // and one or more digests of the content.
-func newRegularFile(p string, fi os.FileInfo, base *resource, dgsts ...digest.Digest) (RegularFile, error) {
-	if !fi.Mode().IsRegular() {
+func newRegularFile(base *resource, paths []string, size int64, dgsts ...digest.Digest) (RegularFile, error) {
+	if !base.Mode().IsRegular() {
 		return nil, fmt.Errorf("not a regular file")
 	}
 
+	base.paths = make([]string, len(paths))
+	copy(base.paths, paths)
+
 	// make our own copy of digests
-	ds := make([]digest.Digest, 0, len(dgsts))
+	ds := make([]digest.Digest, len(dgsts))
 	copy(ds, dgsts)
 
 	return &regularFile{
 		resource: *base,
-		size:     fi.Size(),
+		size:     size,
 		digests:  ds,
 	}, nil
 }
@@ -277,8 +280,8 @@ type directory struct {
 
 var _ Directory = &directory{}
 
-func newDirectory(p string, fi os.FileInfo, base *resource) (Directory, error) {
-	if !fi.Mode().IsDir() {
+func newDirectory(base *resource) (Directory, error) {
+	if !base.Mode().IsDir() {
 		return nil, fmt.Errorf("not a directory")
 	}
 
@@ -306,7 +309,11 @@ type symLink struct {
 
 var _ SymLink = &symLink{}
 
-func newSymLink(p string, fi os.FileInfo, base *resource, target string) (SymLink, error) {
+func newSymLink(base *resource, target string) (SymLink, error) {
+	if base.Mode()&os.ModeSymlink == 0 {
+		return nil, fmt.Errorf("not a symlink")
+	}
+
 	return &symLink{
 		resource: *base,
 		target:   target,
@@ -323,7 +330,11 @@ type namedPipe struct {
 
 var _ NamedPipe = &namedPipe{}
 
-func newNamedPipe(p string, fi os.FileInfo, base *resource) (NamedPipe, error) {
+func newNamedPipe(base *resource) (NamedPipe, error) {
+	if base.Mode()&os.ModeNamedPipe == 0 {
+		return nil, fmt.Errorf("not a namedpipe")
+	}
+
 	return &namedPipe{
 		resource: *base,
 	}, nil
@@ -338,8 +349,8 @@ type device struct {
 
 var _ Device = &device{}
 
-func newDevice(p string, fi os.FileInfo, base *resource, major, minor uint64) (Device, error) {
-	if fi.Mode()&os.ModeDevice == 0 {
+func newDevice(base *resource, major, minor uint64) (Device, error) {
+	if base.Mode()&os.ModeDevice == 0 {
 		return nil, fmt.Errorf("not a device")
 	}
 
@@ -357,12 +368,6 @@ func (d device) Major() uint64 {
 func (d device) Minor() uint64 {
 	return d.minor
 }
-
-type resourceByPath []Resource
-
-func (bp resourceByPath) Len() int           { return len(bp) }
-func (bp resourceByPath) Swap(i, j int)      { bp[i], bp[j] = bp[j], bp[i] }
-func (bp resourceByPath) Less(i, j int) bool { return bp[i].Path() < bp[j].Path() }
 
 // toProto converts a resource to a protobuf record. We'd like to push this
 // the individual types but we want to keep this all together during
@@ -398,6 +403,41 @@ func toProto(resource Resource) *pb.Resource {
 	sort.Strings(b.Path)
 
 	return b
+}
+
+// fromProto converts from a protobuf Resource to a Resource interface.
+func fromProto(b *pb.Resource) (Resource, error) {
+	base, err := newBaseResource(b.Path[0], os.FileMode(b.Mode), b.Uid, b.Gid)
+	if err != nil {
+		return nil, err
+	}
+
+	base.xattrs = make(map[string][]byte, len(b.Xattr))
+
+	for attr, value := range b.Xattr {
+		base.xattrs[attr] = append(base.xattrs[attr], value...)
+	}
+
+	switch {
+	case base.Mode().IsRegular():
+		dgsts := make([]digest.Digest, len(b.Digest))
+		for i, dgst := range b.Digest {
+			// TODO(stevvooe): Should we be validating at this point?
+			dgsts[i] = digest.Digest(dgst)
+		}
+
+		return newRegularFile(base, b.Path, int64(b.Size), dgsts...)
+	case base.Mode().IsDir():
+		return newDirectory(base)
+	case base.Mode()&os.ModeSymlink != 0:
+		return newSymLink(base, b.Target)
+	case base.Mode()&os.ModeNamedPipe != 0:
+		return newNamedPipe(base)
+	case base.Mode()&os.ModeDevice != 0:
+		return newDevice(base, b.Major, b.Minor)
+	}
+
+	return nil, fmt.Errorf("unknown resource record (%#v): %s", b, base.Mode())
 }
 
 // NOTE(stevvooe): An alternative model that supports inline declaration.

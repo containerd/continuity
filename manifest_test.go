@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/docker/distribution/digest"
-	"github.com/golang/protobuf/proto"
 )
 
 // Hard things:
@@ -133,12 +132,12 @@ func TestWalkFS(t *testing.T) {
 		t.Fatalf("error getting context: %v", err)
 	}
 
-	bm, err := BuildManifest(ctx)
+	m, err := BuildManifest(ctx)
 	if err != nil {
 		t.Fatalf("error building manifest: %v, %#T", err, err)
 	}
 
-	proto.MarshalText(os.Stdout, bm)
+	MarshalText(os.Stdout, m)
 	t.Fail() // TODO(stevvooe): Actually test input/output matches
 }
 
