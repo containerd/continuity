@@ -1,27 +1,19 @@
-package continuity
+package sysx
 
 import (
 	"bytes"
 	"syscall"
 )
 
-const (
-	XATTR_NOFOLLOW = iota << 1
-	XATTR_CREATE
-	XATTR_REPLACE
-)
-
 const defaultXattrBufferSize = 5
 
-func Setxattr(path, name string, data []byte) error {
-	return setxattr(path, name, data, XATTR_NOFOLLOW)
-}
+type listxattrFunc func(path string, dest []byte) (int, error)
 
-func Listxattr(path string) ([]string, error) {
+func listxattrAll(path string, listFunc listxattrFunc) ([]string, error) {
 	var p []byte // nil on first execution
 
 	for {
-		n, err := listxattr(path, p, XATTR_NOFOLLOW) // first call gets buffer size.
+		n, err := listFunc(path, p) // first call gets buffer size.
 		if err != nil {
 			return nil, err
 		}
@@ -46,10 +38,12 @@ func Listxattr(path string) ([]string, error) {
 	}
 }
 
-func Getxattr(path, attr string) ([]byte, error) {
-	var p []byte = make([]byte, defaultXattrBufferSize)
+type getxattrFunc func(string, string, []byte) (int, error)
+
+func getxattrAll(path, attr string, getFunc getxattrFunc) ([]byte, error) {
+	p := make([]byte, defaultXattrBufferSize)
 	for {
-		n, err := getxattr(path, attr, p)
+		n, err := getFunc(path, attr, p)
 		if err != nil {
 			if errno, ok := err.(syscall.Errno); ok && errno == syscall.ERANGE {
 				p = make([]byte, len(p)*2) // this can't be ideal.
