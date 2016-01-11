@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "crypto/sha256"
+
 	"github.com/stevvooe/continuity/commands"
 )
 
