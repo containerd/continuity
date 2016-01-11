@@ -1,6 +1,7 @@
 package continuity
 
 import (
+	_ "crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -190,10 +191,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 			size := rand.Intn(4 << 20)
 			d := make([]byte, size)
 			randomBytes(d)
-			dgst, err := digest.FromBytes(d)
-			if err != nil {
-				t.Fatalf("error digesting %q: %v", p, err)
-			}
+			dgst := digest.FromBytes(d)
 			resources[i].digest = dgst
 
 			// this relies on the proper directory parent being defined.
