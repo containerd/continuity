@@ -1,6 +1,9 @@
 package continuity
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 // Driver provides all of the system-level functions in a common interface.
 // The context should call these with full paths and should never use the `os`
@@ -17,6 +20,13 @@ type Driver interface {
 	Stat(path string) (os.FileInfo, error)
 	Lstat(path string) (os.FileInfo, error)
 	Readlink(p string) (string, error)
+	Mkdir(path string, mode os.FileMode) error
+	Remove(path string) error
+
+	Link(oldname, newname string) error
+	Lchmod(path string, mode os.FileMode) error
+	Lchown(path, uid, gid string) error
+	Symlink(oldname, newname string) error
 
 	// NOTE(stevvooe): We may want to actually include the path manipulation
 	// functions here, as well. They have been listed below to make the
@@ -92,4 +102,38 @@ func (d *driver) Lstat(p string) (os.FileInfo, error) {
 
 func (d *driver) Readlink(p string) (string, error) {
 	return os.Readlink(p)
+}
+
+func (d *driver) Mkdir(p string, mode os.FileMode) error {
+	return os.Mkdir(p, mode)
+}
+
+// Remove is used to unlink files and remove directories.
+// This is following the golang os package api which
+// combines the operations into a higher level Remove
+// function. If explicit unlinking or directory removal
+// to mirror system call is required, they should be
+// split up at that time.
+func (d *driver) Remove(path string) error {
+	return os.Remove(path)
+}
+
+func (d *driver) Link(oldname, newname string) error {
+	return os.Link(oldname, newname)
+}
+
+func (d *driver) Lchown(name, uidStr, gidStr string) error {
+	uid, err := strconv.Atoi(uidStr)
+	if err != nil {
+		return err
+	}
+	gid, err := strconv.Atoi(uidStr)
+	if err != nil {
+		return err
+	}
+	return os.Lchown(name, uid, gid)
+}
+
+func (d *driver) Symlink(oldname, newname string) error {
+	return os.Symlink(oldname, newname)
 }
