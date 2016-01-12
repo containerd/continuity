@@ -1,12 +1,17 @@
 package continuity
 
 import (
+	_ "crypto/sha256"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"syscall"
 	"testing"
 
 	"github.com/docker/distribution/digest"
@@ -138,7 +143,34 @@ func TestWalkFS(t *testing.T) {
 	}
 
 	MarshalText(os.Stdout, m)
-	t.Fail() // TODO(stevvooe): Actually test input/output matches
+
+	// TODO(dmcgowan): always verify, currently hard links not supported
+	//if err := VerifyManifest(ctx, m); err != nil {
+	//	t.Fatalf("error verifying manifest: %v")
+	//}
+
+	expectedResources, err := expectedResourceList(testResources)
+	if err != nil {
+		// TODO(dmcgowan): update function to panic, this would mean test setup error
+		t.Fatalf("error creating resource list: %v", err)
+	}
+
+	// Diff resources
+	diff := diffResourceList(expectedResources, m.Resources)
+	if diff.HasDiff() {
+		t.Log("Resource list difference")
+		for _, a := range diff.Additions {
+			t.Logf("Unexpected resource: %#v", a, a)
+		}
+		for _, d := range diff.Deletions {
+			t.Logf("Missing resource: %#v", d, d)
+		}
+		for _, u := range diff.Updates {
+			t.Logf("Changed resource:\n\tExpected: %#v\n\tActual:   %#v", u.Original, u.Updated)
+		}
+
+		t.FailNow()
+	}
 }
 
 // TODO(stevvooe): At this time, we have a nice testing framework to define
@@ -179,6 +211,9 @@ type dresource struct {
 	mode         os.FileMode
 	target       string // hard/soft link target
 	digest       digest.Digest
+	size         int
+	uid          int
+	gid          int
 	major, minor int
 }
 
@@ -190,11 +225,9 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 			size := rand.Intn(4 << 20)
 			d := make([]byte, size)
 			randomBytes(d)
-			dgst, err := digest.FromBytes(d)
-			if err != nil {
-				t.Fatalf("error digesting %q: %v", p, err)
-			}
+			dgst := digest.FromBytes(d)
 			resources[i].digest = dgst
+			resources[i].size = size
 
 			// this relies on the proper directory parent being defined.
 			if err := ioutil.WriteFile(p, d, resource.mode); err != nil {
@@ -227,6 +260,16 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 		default:
 			t.Fatalf("unknown resource type: %v", resource.kind)
 		}
+
+		st, err := os.Lstat(p)
+		if err != nil {
+			t.Fatalf("error statting after creation: %v", err)
+		}
+		resources[i].uid = int(st.Sys().(*syscall.Stat_t).Uid)
+		resources[i].gid = int(st.Sys().(*syscall.Stat_t).Gid)
+		resources[i].mode = st.Mode()
+
+		// TODO: Readback and join xattr
 	}
 
 	// log the test root for future debugging
@@ -258,4 +301,118 @@ func randomBytes(p []byte) {
 	for i := range p {
 		p[i] = byte(rand.Intn(1<<8 - 1))
 	}
+}
+
+// expectedResourceList sorts the set of resources into the order
+// expected in the manifest and collapses hardlinks
+func expectedResourceList(resources []dresource) ([]Resource, error) {
+	resourceMap := map[string]Resource{}
+	paths := []string{}
+	for _, r := range resources {
+		absPath := r.path
+		if !filepath.IsAbs(absPath) {
+			absPath = "/" + absPath
+		}
+		uidStr := strconv.Itoa(r.uid)
+		gidStr := strconv.Itoa(r.uid)
+		switch r.kind {
+		case rfile:
+			f := &regularFile{
+				resource: resource{
+					paths: []string{absPath},
+					mode:  r.mode,
+					uid:   uidStr,
+					gid:   gidStr,
+				},
+				size:    int64(r.size),
+				digests: []digest.Digest{r.digest},
+			}
+			resourceMap[absPath] = f
+			paths = append(paths, absPath)
+		case rdirectory:
+			d := &directory{
+				resource: resource{
+					paths: []string{absPath},
+					mode:  r.mode,
+					uid:   uidStr,
+					gid:   gidStr,
+				},
+			}
+			resourceMap[absPath] = d
+			paths = append(paths, absPath)
+		case rhardlink:
+			targetPath := r.target
+			if !filepath.IsAbs(targetPath) {
+				targetPath = "/" + targetPath
+			}
+			target, ok := resourceMap[targetPath]
+			if !ok {
+				return nil, errors.New("must specify target before hardlink for test resources")
+			}
+			rf, ok := target.(*regularFile)
+			if !ok {
+				return nil, errors.New("hardlink target must be regular file")
+			}
+			// TODO(dmcgowan): full merge
+			rf.paths = append(rf.paths, absPath)
+			// TODO(dmcgowan): check if first path is now different, changes source order and should update
+			// resource map key, to avoid canonically ordered first should be regular file
+			sort.Stable(sort.StringSlice(rf.paths))
+		case rrelsymlink, rabssymlink:
+			targetPath := r.target
+			if r.kind == rabssymlink && !filepath.IsAbs(r.target) {
+				targetPath = "/" + targetPath
+			}
+			s := &symLink{
+				resource: resource{
+					paths: []string{absPath},
+					mode:  r.mode,
+					uid:   uidStr,
+					gid:   gidStr,
+				},
+				target: targetPath,
+			}
+			resourceMap[absPath] = s
+			paths = append(paths, absPath)
+		case rchardev:
+			d := &device{
+				resource: resource{
+					paths: []string{absPath},
+					mode:  r.mode,
+					uid:   uidStr,
+					gid:   gidStr,
+				},
+				major: uint64(r.major),
+				minor: uint64(r.minor),
+			}
+			resourceMap[absPath] = d
+			paths = append(paths, absPath)
+		case rnamedpipe:
+			p := &namedPipe{
+				resource: resource{
+					paths: []string{absPath},
+					mode:  r.mode,
+					uid:   uidStr,
+					gid:   gidStr,
+				},
+			}
+			resourceMap[absPath] = p
+			paths = append(paths, absPath)
+		default:
+			return nil, fmt.Errorf("unknown resource type: %v", r.kind)
+		}
+	}
+
+	if len(resourceMap) < len(paths) {
+		return nil, errors.New("resource list has duplicated paths")
+	}
+
+	sort.Strings(paths)
+
+	manifestResources := make([]Resource, len(paths))
+	for i, p := range paths {
+		manifestResources[i] = resourceMap[p]
+	}
+
+	return manifestResources, nil
 }

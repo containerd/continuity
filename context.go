@@ -143,7 +143,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 
 		if filepath.IsAbs(target) {
 			// contain the absolute path to the context root.
-			target, err = c.contain(p)
+			target, err = c.contain(target)
 			if err != nil {
 				return nil, err
 			}
