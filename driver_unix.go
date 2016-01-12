@@ -4,10 +4,24 @@ package continuity
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/stevvooe/continuity/sysx"
 )
+
+// Lchmod changes the mode of an file not following symlinks.
+func (d *driver) Lchmod(path string, mode os.FileMode) (err error) {
+	if !filepath.IsAbs(path) {
+		path, err = filepath.Abs(path)
+		if err != nil {
+			return
+		}
+	}
+
+	return sysx.Fchmodat(0, path, uint32(mode), sysx.AtSymlinkNofollow)
+}
 
 // Getxattr returns all of the extended attributes for the file at path p.
 func (d *driver) Getxattr(p string) (map[string][]byte, error) {

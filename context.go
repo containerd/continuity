@@ -28,12 +28,18 @@ type Context interface {
 	Walk(filepath.WalkFunc) error
 }
 
+// SymlinkPath is intended to give the symlink target value
+// in a root context. Target and linkname are absolute paths
+// not under the given root.
+type SymlinkPath func(root, linkname, target string) (string, error)
+
 // context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	driver Driver
-	root   string
+	driver  Driver
+	root    string
+	symPath SymlinkPath
 }
 
 // NewContext returns a Context associated with root. The default driver will
@@ -63,7 +69,11 @@ func NewContext(root string) (Context, error) {
 		return nil, &os.PathError{Op: "NewContext", Path: root, Err: os.ErrInvalid}
 	}
 
-	return &context{root: root, driver: driver}, nil
+	return &context{
+		root:    root,
+		driver:  driver,
+		symPath: AbsoluteSymlinkPath,
+	}, nil
 }
 
 // Resource returns the resource as path p, populating the entry with info
@@ -267,11 +277,117 @@ func (c *context) Verify(resource Resource) error {
 	return nil
 }
 
-// Apply the resource to the contexts. An error will be returned in the
+// Apply the resource to the contexts. An error will be returned if the
 // operation fails. Depending on the resource type, the resource may be
 // created. For resource that cannot be resolved, an error will be returned.
 func (c *context) Apply(resource Resource) error {
-	panic("not implemented")
+	fp, err := c.fullpath(resource.Path())
+	if err != nil {
+		return err
+	}
+
+	var exists bool
+	if _, err := c.driver.Lstat(fp); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		exists = true
+	}
+
+	switch r := resource.(type) {
+	case RegularFile:
+		if !exists {
+			return fmt.Errorf("file does not exist %q", resource.Path())
+		}
+
+		// TODO(dmcgowan): Verify size and digest
+
+		for _, path := range r.Paths() {
+			if path != resource.Path() {
+				lp, err := c.fullpath(path)
+				if err != nil {
+					return err
+				}
+
+				if _, fi := c.driver.Lstat(lp); fi == nil {
+					c.driver.Remove(lp)
+				}
+				if err := c.driver.Link(fp, lp); err != nil {
+					return err
+				}
+			}
+		}
+
+	case Directory:
+		if !exists {
+			if err := c.driver.Mkdir(fp, resource.Mode()); err != nil {
+				return err
+			}
+		}
+	case SymLink:
+		target, err := c.resolveSymlink(r)
+		if err != nil {
+			return err
+		}
+		if exists {
+			currentPath, err := c.driver.Readlink(fp)
+			if err != nil {
+				return err
+			}
+			if currentPath != target {
+				if err := c.driver.Remove(fp); err != nil {
+					return err
+				}
+				exists = false
+			}
+		}
+		if !exists {
+			if err := c.driver.Symlink(target, fp); err != nil {
+				return err
+			}
+			if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Update filemode if file was not created
+	if exists {
+		if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
+			return err
+		}
+	}
+
+	if err := c.driver.Lchown(fp, resource.UID(), resource.GID()); err != nil {
+		return err
+	}
+
+	if xattrer, ok := resource.(XAttrer); ok {
+		// For xattrs, only ensure that we have those defined in the resource
+		// and their values are set. We can ignore other xattrs. In other words,
+		// we only set xattres defined by resource but never remove.
+
+		if _, ok := resource.(SymLink); ok {
+			lxattrDriver, ok := c.driver.(LXAttrDriver)
+			if !ok {
+				return fmt.Errorf("unsupported symlink xattr for resource %q", resource.Path())
+			}
+			if err := lxattrDriver.LSetxattr(fp, xattrer.XAttrs()); err != nil {
+				return err
+			}
+		} else {
+			xattrDriver, ok := c.driver.(XAttrDriver)
+			if !ok {
+				return fmt.Errorf("unsupported xattr for resource %q", resource.Path())
+			}
+			if err := xattrDriver.Setxattr(fp, xattrer.XAttrs()); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // Walk provides a convenience function to call filepath.Walk correctly for
@@ -308,6 +424,14 @@ func (c *context) contain(p string) (string, error) {
 	return filepath.Join("/", filepath.Clean(sanitized)), nil
 }
 
+func (c *context) resolveSymlink(l SymLink) (string, error) {
+	target := l.Target()
+	if filepath.IsAbs(target) {
+		return c.symPath(c.root, l.Path(), target)
+	}
+	return target, nil
+}
+
 // digest returns the digest of the file at path p, relative to the root.
 func (c *context) digest(p string) (digest.Digest, error) {
 	return digestPath(c.driver, filepath.Join(c.root, p))
@@ -338,4 +462,22 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	}
 
 	return nil, nil
+}
+
+// AbsoluteSymlinkPath turns the symlink target into absolute paths from
+// the given root.
+func AbsoluteSymlinkPath(root, linkname, target string) (string, error) {
+	return filepath.Join(root, target), nil
+}
+
+// RelativeSymlinkPath turns the symlink target into a relative path
+// from the given linkname.
+func RelativeSymlinkPath(root, linkname, target string) (string, error) {
+	return filepath.Rel(filepath.Join(root, linkname), target)
+}
+
+// ChrootSymlinkPath uses the given absolute target intended for a
+// chroot environment using the given root.
+func ChrootSymlinkPath(root, linkname, target string) (string, error) {
+	return target, nil
 }

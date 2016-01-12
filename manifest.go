@@ -119,6 +119,8 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 	}, nil
 }
 
+// VerifyManifest verifies all the resources in a manifest
+// against files from the given context.
 func VerifyManifest(ctx Context, manifest *Manifest) error {
 	for _, resource := range manifest.Resources {
 		if err := ctx.Verify(resource); err != nil {
@@ -129,6 +131,14 @@ func VerifyManifest(ctx Context, manifest *Manifest) error {
 	return nil
 }
 
-func ApplyManifest(ctx Context, manifest *pb.Manifest) error {
-	panic("not implemented")
+// ApplyManifest applies on the resources in a manifest to
+// the given context.
+func ApplyManifest(ctx Context, manifest *Manifest) error {
+	for _, resource := range manifest.Resources {
+		if err := ctx.Apply(resource); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
