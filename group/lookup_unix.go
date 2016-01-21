@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Derived from os/user package in Go standard library
+
 // +build darwin dragonfly freebsd !android,linux netbsd openbsd solaris
 // +build cgo
 

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Derived from os/user package in Go standard library
+
 package group
 
 // Lookup looks up a group by groupname. If the group cannot be found, the
