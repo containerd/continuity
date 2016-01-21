@@ -236,22 +236,18 @@ func (r *resource) Mode() os.FileMode {
 
 func (r *resource) UID() string {
 	if r.user != "" {
-		u, err := user.Lookup(r.user)
-		if err == nil {
-			return u.Uid
+		if uid := lookupUser(r.user); uid != "" {
+			return uid
 		}
-		// TODO(dmcgowan): handle non "user.UnknownUserError"
 	}
 	return r.uid
 }
 
 func (r *resource) GID() string {
 	if r.group != "" {
-		g, err := group.Lookup(r.group)
-		if err == nil {
-			return g.Gid
+		if gid := lookupGroup(r.group); gid != "" {
+			return gid
 		}
-		// TODO(dmcgowan): handle non "group.UnknownGroupError"
 	}
 	return r.gid
 }
