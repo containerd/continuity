@@ -14,8 +14,6 @@ message Resource {
     // a link target. The path format is operating system specific.
     repeated string path = 1;
 
-    // NOTE(stevvooe): Need to define clear precedence for user/group/uid/gid precedence.
-
     // Uid specifies the user id for the resource. A string type is used for
     // compatibility across different OS.
     string uid = 2;
@@ -24,10 +22,16 @@ message Resource {
     // compatibility across different OS.
     string gid = 3;
 
-    // user and group are not currently used but their field numbers have been
     // reserved for future use. As such, they are marked as deprecated.
-    string user = 4 [deprecated=true];
-    string group = 5 [deprecated=true];
+    // User specifies the user associated for the resource. The user should
+    // will be used in preference to the Uid when the two do not match
+    // on a system.
+    string user = 4;
+
+    // Group specifies the group associated for the resource. The group should
+    // will be used in preference to the Gid when the two do not match
+    // on a system.
+    string group = 5;
 
     // Mode defines the file mode and permissions. We've used the same
     // bit-packing from Go's os package,
