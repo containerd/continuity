@@ -286,6 +286,7 @@ func (c *context) Apply(resource Resource) error {
 		return err
 	}
 
+	var chmod = true
 	var exists bool
 	if _, err := c.driver.Lstat(fp); err != nil {
 		if !os.IsNotExist(err) {
@@ -346,14 +347,16 @@ func (c *context) Apply(resource Resource) error {
 			if err := c.driver.Symlink(target, fp); err != nil {
 				return err
 			}
-			if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
-				return err
-			}
+			// Not supported on linux, skip chmod on links
+			//if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
+			//	return err
+			//}
 		}
+		chmod = false
 	}
 
 	// Update filemode if file was not created
-	if exists {
+	if chmod && exists {
 		if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
 			return err
 		}
