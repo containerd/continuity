@@ -293,13 +293,18 @@ func NewFSFromManifest(manifest *continuity.Manifest, mountRoot string, provider
 			}
 			continue
 		}
-
 		f := NewFile(inode, provider)
 		if err := f.setResource(resource); err != nil {
 			return nil, err
 		}
+		if rf, ok := resource.(continuity.RegularFile); ok {
 
-		addNode(resource.Path(), f, dirCache, provider)
+			for _, p := range rf.Paths() {
+				addNode(p, f, dirCache, provider)
+			}
+		} else {
+			addNode(resource.Path(), f, dirCache, provider)
+		}
 	}
 
 	return tree, nil
