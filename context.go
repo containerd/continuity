@@ -243,7 +243,10 @@ func (c *context) Verify(resource Resource) error {
 			return fmt.Errorf("digests for resource %q do not match: %v != %v", t.Path(), t.Digests(), r.Digests())
 		}
 	case Directory:
-		// nothing to be done here.
+		t, ok := target.(Directory)
+		if !ok {
+			return fmt.Errorf("resource %q target not a directory: %v", t)
+		}
 	case SymLink:
 		t, ok := target.(SymLink)
 		if !ok {
@@ -287,6 +290,10 @@ func (c *context) Apply(resource Resource) error {
 			return fmt.Errorf("file does not exist %q", resource.Path())
 		}
 
+		if !fi.Mode().IsRegular() {
+			return fmt.Errorf("file %q should be a regular file, but is not", resource.Path())
+		}
+
 		// TODO(dmcgowan): Verify size and digest
 
 		for _, path := range r.Paths() {
@@ -310,7 +317,10 @@ func (c *context) Apply(resource Resource) error {
 			if err := c.driver.Mkdir(fp, resource.Mode()); err != nil {
 				return err
 			}
+		} else if !fi.Mode().IsDir() {
+			return fmt.Errorf("%q should be a directory, but is not", resource.Path())
 		}
+
 	case SymLink:
 		var target string // only possibly set if target resource is a symlink
 
