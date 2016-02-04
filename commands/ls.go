@@ -27,7 +27,12 @@ var LSCmd = &cobra.Command{
 
 		for _, entry := range bm.Resource {
 			for _, path := range entry.Path {
-				fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path)
+				if os.FileMode(entry.Mode)&os.ModeSymlink != 0 {
+					fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v -> %v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path, entry.Target)
+				} else {
+					fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path)
+				}
+
 			}
 		}
 
