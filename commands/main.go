@@ -19,31 +19,31 @@ var (
 
 	// usageTemplate is nearly identical to the default template without the
 	// automatic addition of flags. Instead, Command.Use is used unmodified.
-	usageTemplate = `{{ $cmd := . }}
-Usage: {{if .Runnable}}
-  {{.UseLine}}{{end}}{{if gt .Aliases 0}}
+	usageTemplate = `Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasSubCommands}}
+  {{ .CommandPath}} [command]{{end}}{{if gt .Aliases 0}}
 
 Aliases:
   {{.NameAndAliases}}
 {{end}}{{if .HasExample}}
 
 Examples:
-{{ .Example }}{{end}}{{ if .HasNonHelpSubCommands}}
+{{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
 
-Available Commands: {{range .Commands}}{{if (not .IsHelpCommand)}}
+Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasLocalFlags}}
 
 Flags:
-{{.LocalFlags.FlagUsages}}{{end}}{{ if .HasInheritedFlags}}
+{{.LocalFlags.FlagUsages | trimRightSpace}}{{end}}{{ if .HasInheritedFlags}}
 
 Global Flags:
-{{.InheritedFlags.FlagUsages}}{{end}}{{if .HasHelpSubCommands}}
+{{.InheritedFlags.FlagUsages | trimRightSpace}}{{end}}{{if .HasHelpSubCommands}}
 
-Additional help topics: {{range .Commands}}{{if .IsHelpCommand}}
-  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}}{{end}}{{end}}{{ if .HasSubCommands }}
+Additional help topics:{{range .Commands}}{{if .IsHelpCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasSubCommands }}
 
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-{{end}}`
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 )
 
 func init() {
