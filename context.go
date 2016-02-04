@@ -37,9 +37,8 @@ type SymlinkPath func(root, linkname, target string) (string, error)
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	driver  Driver
-	root    string
-	symPath SymlinkPath
+	driver Driver
+	root   string
 }
 
 // NewContext returns a Context associated with root. The default driver will
@@ -70,9 +69,8 @@ func NewContext(root string) (Context, error) {
 	}
 
 	return &context{
-		root:    root,
-		driver:  driver,
-		symPath: AbsoluteSymlinkPath,
+		root:   root,
+		driver: driver,
 	}, nil
 }
 
@@ -139,21 +137,6 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		target, err := c.driver.Readlink(fp)
 		if err != nil {
 			return nil, err
-		}
-
-		if filepath.IsAbs(target) {
-			// contain the absolute path to the context root.
-			target, err = c.contain(target)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			// make sure the target is contained in the root by evaluating the
-			// link and checking the prefix.
-			real := filepath.Join(fp, target)
-			if !strings.HasPrefix(real, c.root) {
-				return nil, fmt.Errorf("uncontained symlink: %q -> %q, real = %q", fp, target, real)
-			}
 		}
 
 		return newSymLink(base, target)
@@ -286,19 +269,21 @@ func (c *context) Apply(resource Resource) error {
 		return err
 	}
 
+	if !strings.HasPrefix(fp, c.root) {
+		return fmt.Errorf("resource %v escapes root", resource)
+	}
+
 	var chmod = true
-	var exists bool
-	if _, err := c.driver.Lstat(fp); err != nil {
+	fi, err := c.driver.Lstat(fp)
+	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-	} else {
-		exists = true
 	}
 
 	switch r := resource.(type) {
 	case RegularFile:
-		if !exists {
+		if fi == nil {
 			return fmt.Errorf("file does not exist %q", resource.Path())
 		}
 
@@ -321,42 +306,40 @@ func (c *context) Apply(resource Resource) error {
 		}
 
 	case Directory:
-		if !exists {
+		if fi == nil {
 			if err := c.driver.Mkdir(fp, resource.Mode()); err != nil {
 				return err
 			}
 		}
 	case SymLink:
-		target, err := c.resolveSymlink(r)
-		if err != nil {
-			return err
-		}
-		if exists {
-			currentPath, err := c.driver.Readlink(fp)
-			if err != nil {
-				return err
-			}
-			if currentPath != target {
-				if err := c.driver.Remove(fp); err != nil {
+		var target string // only possibly set if target resource is a symlink
+
+		if fi != nil {
+			if fi.Mode()&os.ModeSymlink != 0 {
+				target, err = c.driver.Readlink(fp)
+				if err != nil {
 					return err
 				}
-				exists = false
 			}
 		}
-		if !exists {
-			if err := c.driver.Symlink(target, fp); err != nil {
+
+		if target != r.Target() {
+			if err := c.driver.Remove(fp); err != nil { // RemoveAll?
 				return err
 			}
-			// Not supported on linux, skip chmod on links
-			//if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
-			//	return err
-			//}
+
+			if err := c.driver.Symlink(r.Target(), fp); err != nil {
+				return err
+			}
 		}
+
+		// NOTE(stevvooe): Chmod on symlink is not supported on linux. We
+		// may want to maintain support for other platforms that have it.
 		chmod = false
 	}
 
 	// Update filemode if file was not created
-	if chmod && exists {
+	if chmod {
 		if err := c.driver.Lchmod(fp, resource.Mode()); err != nil {
 			return err
 		}
@@ -427,14 +410,6 @@ func (c *context) contain(p string) (string, error) {
 	return filepath.Join("/", filepath.Clean(sanitized)), nil
 }
 
-func (c *context) resolveSymlink(l SymLink) (string, error) {
-	target := l.Target()
-	if filepath.IsAbs(target) {
-		return c.symPath(c.root, l.Path(), target)
-	}
-	return target, nil
-}
-
 // digest returns the digest of the file at path p, relative to the root.
 func (c *context) digest(p string) (digest.Digest, error) {
 	return digestPath(c.driver, filepath.Join(c.root, p))
@@ -465,22 +440,4 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	}
 
 	return nil, nil
-}
-
-// AbsoluteSymlinkPath turns the symlink target into absolute paths from
-// the given root.
-func AbsoluteSymlinkPath(root, linkname, target string) (string, error) {
-	return filepath.Join(root, target), nil
-}
-
-// RelativeSymlinkPath turns the symlink target into a relative path
-// from the given linkname.
-func RelativeSymlinkPath(root, linkname, target string) (string, error) {
-	return filepath.Rel(filepath.Join(root, linkname), target)
-}
-
-// ChrootSymlinkPath uses the given absolute target intended for a
-// chroot environment using the given root.
-func ChrootSymlinkPath(root, linkname, target string) (string, error) {
-	return target, nil
 }
