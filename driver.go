@@ -127,7 +127,7 @@ func (d *driver) Lchown(name, uidStr, gidStr string) error {
 	if err != nil {
 		return err
 	}
-	gid, err := strconv.Atoi(uidStr)
+	gid, err := strconv.Atoi(gidStr)
 	if err != nil {
 		return err
 	}
