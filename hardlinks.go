@@ -10,26 +10,19 @@ var (
 )
 
 type hardlinkManager struct {
-	hardlinks map[hardlinkKey][]RegularFile
+	hardlinks map[hardlinkKey][]Resource
 }
 
 func newHardlinkManager() *hardlinkManager {
 	return &hardlinkManager{
-		hardlinks: map[hardlinkKey][]RegularFile{},
+		hardlinks: map[hardlinkKey][]Resource{},
 	}
 }
 
 // Add attempts to add the resource to the hardlink manager. If the resource
 // cannot be considered as a hardlink candidate, errNotAHardLink is returned.
 func (hlm *hardlinkManager) Add(fi os.FileInfo, resource Resource) error {
-	if !fi.Mode().IsRegular() {
-		return errNotAHardLink
-	}
-
-	// TODO(stevvooe): This check is redundant to that above. May want to
-	// tweak our resource model on this basis.
-	regfile, ok := resource.(RegularFile)
-	if !ok {
+	if _, ok := resource.(Hardlinkable); !ok {
 		return errNotAHardLink
 	}
 
@@ -38,7 +31,7 @@ func (hlm *hardlinkManager) Add(fi os.FileInfo, resource Resource) error {
 		return err
 	}
 
-	hlm.hardlinks[key] = append(hlm.hardlinks[key], regfile)
+	hlm.hardlinks[key] = append(hlm.hardlinks[key], resource)
 
 	return nil
 }

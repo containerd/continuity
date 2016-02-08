@@ -1,6 +1,7 @@
 package continuity
 
 import (
+	"errors"
 	"os"
 	"strconv"
 )
@@ -27,6 +28,11 @@ type Driver interface {
 	Lchmod(path string, mode os.FileMode) error
 	Lchown(path, uid, gid string) error
 	Symlink(oldname, newname string) error
+
+	// TODO(aaronl): These methods might move outside the main Driver
+	// interface in the future as more platforms are added.
+	Mknod(path string, mode os.FileMode, major int, minor int) error
+	Mkfifo(path string, mode os.FileMode) error
 
 	// NOTE(stevvooe): We may want to actually include the path manipulation
 	// functions here, as well. They have been listed below to make the
@@ -136,4 +142,17 @@ func (d *driver) Lchown(name, uidStr, gidStr string) error {
 
 func (d *driver) Symlink(oldname, newname string) error {
 	return os.Symlink(oldname, newname)
+}
+
+func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
+	return mknod(path, mode, major, minor)
+}
+
+func (d *driver) Mkfifo(path string, mode os.FileMode) error {
+	if mode&os.ModeNamedPipe == 0 {
+		return errors.New("mode passed to Mkfifo does not have the named pipe bit set")
+	}
+	// mknod with a mode that has ModeNamedPipe set creates a fifo, not a
+	// device.
+	return mknod(path, mode, 0, 0)
 }
