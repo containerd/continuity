@@ -123,11 +123,11 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 			return nil, err
 		}
 
-		return newRegularFile(base, base.paths, fi.Size(), dgst)
+		return newRegularFile(*base, base.paths, fi.Size(), dgst)
 	}
 
 	if fi.Mode().IsDir() {
-		return newDirectory(base)
+		return newDirectory(*base)
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 {
@@ -139,11 +139,11 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 			return nil, err
 		}
 
-		return newSymLink(base, target)
+		return newSymLink(*base, target)
 	}
 
 	if fi.Mode()&os.ModeNamedPipe != 0 {
-		return newNamedPipe(base)
+		return newNamedPipe(*base, base.paths)
 	}
 
 	if fi.Mode()&os.ModeDevice != 0 {
@@ -160,25 +160,14 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 			return nil, err
 		}
 
-		return newDevice(base, major, minor)
+		return newDevice(*base, base.paths, major, minor)
 	}
 
 	log.Printf("%q (%v) is not supported", fp, fi.Mode())
 	return nil, ErrNotFound
 }
 
-// Verify the resource in the context. An error will be returned a discrepancy
-// is found.
-func (c *context) Verify(resource Resource) error {
-	target, err := c.Resource(resource.Path(), nil)
-	if err != nil {
-		return err
-	}
-
-	if target.Path() != resource.Path() {
-		return fmt.Errorf("resource paths do not match: %q != %q", target.Path(), resource.Path())
-	}
-
+func (c *context) verifyMetadata(resource, target Resource) error {
 	if target.Mode() != resource.Mode() {
 		return fmt.Errorf("resource %q has incorrect mode: %v != %v", target.Path(), target.Mode(), resource.Mode())
 	}
@@ -215,13 +204,6 @@ func (c *context) Verify(resource Resource) error {
 
 	switch r := resource.(type) {
 	case RegularFile:
-		// TODO(stevvooe): We need to grab a target for each path, since a
-		// regular file may be a hardlink. Effectively, we must use t.Paths()
-		// somewhere in here.
-		if len(r.Paths()) > 1 {
-			panic("not implemented")
-		}
-
 		// TODO(stevvooe): Another reason to use a record-based approach. We
 		// have to do another type switch to get this to work. This could be
 		// fixed with an Equal function, but let's study this a little more to
@@ -234,6 +216,114 @@ func (c *context) Verify(resource Resource) error {
 		if t.Size() != r.Size() {
 			return fmt.Errorf("resource %q target has incorrect size: %v != %v", t.Path(), t.Size(), r.Size())
 		}
+	case Directory:
+		t, ok := target.(Directory)
+		if !ok {
+			return fmt.Errorf("resource %q target not a directory", t.Path())
+		}
+	case SymLink:
+		t, ok := target.(SymLink)
+		if !ok {
+			return fmt.Errorf("resource %q target not a symlink", t.Path())
+		}
+
+		if t.Target() != r.Target() {
+			return fmt.Errorf("resource %q target has mismatched target: %q != %q", t.Path(), t.Target(), r.Target())
+		}
+	case Device:
+		t, ok := target.(Device)
+		if !ok {
+			return fmt.Errorf("resource %q is not a device", t.Path())
+		}
+
+		if t.Major() != r.Major() || t.Minor() != r.Minor() {
+			return fmt.Errorf("resource %q has mismatched major/minor numbers: %d,%d != %d,%d", t.Path(), t.Major(), t.Minor(), r.Major(), r.Minor())
+		}
+	case NamedPipe:
+		t, ok := target.(NamedPipe)
+		if !ok {
+			return fmt.Errorf("resource %q is not a named pipe", t.Path())
+		}
+	default:
+		return fmt.Errorf("cannot verify resource: %v", resource)
+	}
+
+	return nil
+}
+
+// Verify the resource in the context. An error will be returned a discrepancy
+// is found.
+func (c *context) Verify(resource Resource) error {
+	fp, err := c.fullpath(resource.Path())
+	if err != nil {
+		return err
+	}
+
+	fi, err := c.driver.Lstat(fp)
+	if err != nil {
+		return err
+	}
+
+	target, err := c.Resource(resource.Path(), fi)
+	if err != nil {
+		return err
+	}
+
+	if target.Path() != resource.Path() {
+		return fmt.Errorf("resource paths do not match: %q != %q", target.Path(), resource.Path())
+	}
+
+	if err := c.verifyMetadata(resource, target); err != nil {
+		return err
+	}
+
+	if h, isHardlinkable := resource.(Hardlinkable); isHardlinkable {
+		hardlinkKey, err := newHardlinkKey(fi)
+		if err == errNotAHardLink {
+			if len(h.Paths()) > 1 {
+				return fmt.Errorf("%q is not a hardlink to %q", h.Paths()[1], resource.Path())
+			}
+		} else if err != nil {
+			return err
+		}
+
+		for _, path := range h.Paths()[1:] {
+			fpLink, err := c.fullpath(path)
+			if err != nil {
+				return err
+			}
+
+			fiLink, err := c.driver.Lstat(fpLink)
+			if err != nil {
+				return err
+			}
+
+			targetLink, err := c.Resource(path, fiLink)
+			if err != nil {
+				return err
+			}
+
+			hardlinkKeyLink, err := newHardlinkKey(fiLink)
+			if err != nil {
+				return err
+			}
+
+			if hardlinkKeyLink != hardlinkKey {
+				return fmt.Errorf("%q is not a hardlink to %q", path, resource.Path())
+			}
+
+			if err := c.verifyMetadata(resource, targetLink); err != nil {
+				return err
+			}
+		}
+	}
+
+	switch r := resource.(type) {
+	case RegularFile:
+		t, ok := target.(RegularFile)
+		if !ok {
+			return fmt.Errorf("resource %q target not a regular file", r.Path())
+		}
 
 		// TODO(stevvooe): This may need to get a little more sophisticated
 		// for digest comparison. We may want to actually calculate the
@@ -242,22 +332,6 @@ func (c *context) Verify(resource Resource) error {
 		if !digestsMatch(t.Digests(), r.Digests()) {
 			return fmt.Errorf("digests for resource %q do not match: %v != %v", t.Path(), t.Digests(), r.Digests())
 		}
-	case Directory:
-		t, ok := target.(Directory)
-		if !ok {
-			return fmt.Errorf("resource %q target not a directory: %v", t)
-		}
-	case SymLink:
-		t, ok := target.(SymLink)
-		if !ok {
-			return fmt.Errorf("resource %q target not a symlink: %v", t)
-		}
-
-		if t.Target() != r.Target() {
-			return fmt.Errorf("resource %q target has mismatched target: %q != %q", t.Target(), r.Target())
-		}
-	default:
-		return fmt.Errorf("cannot verify resource: %v", resource)
 	}
 
 	return nil
@@ -296,22 +370,6 @@ func (c *context) Apply(resource Resource) error {
 
 		// TODO(dmcgowan): Verify size and digest
 
-		for _, path := range r.Paths() {
-			if path != resource.Path() {
-				lp, err := c.fullpath(path)
-				if err != nil {
-					return err
-				}
-
-				if _, fi := c.driver.Lstat(lp); fi == nil {
-					c.driver.Remove(lp)
-				}
-				if err := c.driver.Link(fp, lp); err != nil {
-					return err
-				}
-			}
-		}
-
 	case Directory:
 		if fi == nil {
 			if err := c.driver.Mkdir(fp, resource.Mode()); err != nil {
@@ -346,6 +404,58 @@ func (c *context) Apply(resource Resource) error {
 		// NOTE(stevvooe): Chmod on symlink is not supported on linux. We
 		// may want to maintain support for other platforms that have it.
 		chmod = false
+
+	case Device:
+		if fi == nil {
+			if err := c.driver.Mknod(fp, resource.Mode(), int(r.Major()), int(r.Minor())); err != nil {
+				return err
+			}
+		} else if (fi.Mode() & os.ModeDevice) == 0 {
+			return fmt.Errorf("%q should be a device, but is not", resource.Path())
+		} else {
+			major, minor, err := deviceInfo(fi)
+			if err != nil {
+				return err
+			}
+			if major != r.Major() || minor != r.Minor() {
+				if err := c.driver.Remove(fp); err != nil {
+					return err
+				}
+
+				if err := c.driver.Mknod(fp, resource.Mode(), int(r.Major()), int(r.Minor())); err != nil {
+					return err
+				}
+			}
+		}
+
+	case NamedPipe:
+		if fi == nil {
+			if err := c.driver.Mkfifo(fp, resource.Mode()); err != nil {
+				return err
+			}
+		} else if (fi.Mode() & os.ModeNamedPipe) == 0 {
+			return fmt.Errorf("%q should be a named pipe, but is not", resource.Path())
+		}
+	}
+
+	if h, isHardlinkable := resource.(Hardlinkable); isHardlinkable {
+		for _, path := range h.Paths() {
+			if path == resource.Path() {
+				continue
+			}
+
+			lp, err := c.fullpath(path)
+			if err != nil {
+				return err
+			}
+
+			if _, fi := c.driver.Lstat(lp); fi == nil {
+				c.driver.Remove(lp)
+			}
+			if err := c.driver.Link(fp, lp); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Update filemode if file was not created
