@@ -8,18 +8,18 @@ import (
 	"github.com/docker/distribution/digest"
 )
 
-// digestPath returns the digest of the file at path p. Currently, this only
-// uses the value of digest.Canonical to resolve the hash to use.
-func digestPath(d Driver, p string) (digest.Digest, error) {
-	digester := digest.Canonical.New() // TODO(stevvooe): Make this configurable.
+type Digester interface {
+	Digest(io.Reader) (digest.Digest, error)
+}
 
-	f, err := d.Open(p)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
+type simpleDigester struct {
+	algorithm digest.Algorithm
+}
 
-	if _, err := io.Copy(digester.Hash(), f); err != nil {
+func (sd simpleDigester) Digest(r io.Reader) (digest.Digest, error) {
+	digester := sd.algorithm.New()
+
+	if _, err := io.Copy(digester.Hash(), r); err != nil {
 		return "", err
 	}
 
