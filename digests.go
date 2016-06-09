@@ -8,8 +8,14 @@ import (
 	"github.com/docker/distribution/digest"
 )
 
+// Digester produces a digest for a given read stream
 type Digester interface {
 	Digest(io.Reader) (digest.Digest, error)
+}
+
+// ContentProvider produces a read stream for a given digest
+type ContentProvider interface {
+	Reader(digest.Digest) (io.ReadCloser, error)
 }
 
 type simpleDigester struct {
