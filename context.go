@@ -3,6 +3,7 @@ package continuity
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -33,26 +34,47 @@ type Context interface {
 // not under the given root.
 type SymlinkPath func(root, linkname, target string) (string, error)
 
+type ContextOptions struct {
+	Digester Digester
+	Driver   Driver
+	Provider ContentProvider
+}
+
 // context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	driver Driver
-	root   string
+	driver   Driver
+	root     string
+	digester Digester
+	provider ContentProvider
 }
 
 // NewContext returns a Context associated with root. The default driver will
 // be used, as returned by NewDriver.
 func NewContext(root string) (Context, error) {
+	return NewContextWithOptions(root, ContextOptions{})
+}
+
+// NewContextWithOptions returns a Context associate with the root.
+func NewContextWithOptions(root string, options ContextOptions) (Context, error) {
 	// normalize to absolute path
 	root, err := filepath.Abs(filepath.Clean(root))
 	if err != nil {
 		return nil, err
 	}
 
-	driver, err := NewSystemDriver()
-	if err != nil {
-		return nil, err
+	driver := options.Driver
+	if driver == nil {
+		driver, err = NewSystemDriver()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	digester := options.Digester
+	if digester == nil {
+		digester = simpleDigester{digest.Canonical}
 	}
 
 	// Check the root directory. Need to be a little careful here. We are
@@ -69,8 +91,10 @@ func NewContext(root string) (Context, error) {
 	}
 
 	return &context{
-		root:   root,
-		driver: driver,
+		root:     root,
+		driver:   driver,
+		digester: digester,
+		provider: options.Provider,
 	}, nil
 }
 
@@ -337,6 +361,28 @@ func (c *context) Verify(resource Resource) error {
 	return nil
 }
 
+func (c *context) checkoutFile(fp string, rf RegularFile) error {
+	if c.provider == nil {
+		return fmt.Errorf("no file provider")
+	}
+	var (
+		r   io.ReadCloser
+		err error
+	)
+	for _, dgst := range rf.Digests() {
+		r, err = c.provider.Reader(dgst)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("file content could not be provided: %v", err)
+	}
+	defer r.Close()
+
+	return atomicWriteFile(fp, r, rf)
+}
+
 // Apply the resource to the contexts. An error will be returned if the
 // operation fails. Depending on the resource type, the resource may be
 // created. For resource that cannot be resolved, an error will be returned.
@@ -361,15 +407,40 @@ func (c *context) Apply(resource Resource) error {
 	switch r := resource.(type) {
 	case RegularFile:
 		if fi == nil {
-			return fmt.Errorf("file does not exist %q", resource.Path())
+			if err := c.checkoutFile(fp, r); err != nil {
+				return fmt.Errorf("error checking out file %q: %v", resource.Path(), err)
+			}
+			chmod = false
+		} else {
+			if !fi.Mode().IsRegular() {
+				return fmt.Errorf("file %q should be a regular file, but is not", resource.Path())
+			}
+			if fi.Size() != r.Size() {
+				if err := c.checkoutFile(fp, r); err != nil {
+					return fmt.Errorf("error checking out file %q: %v", resource.Path(), err)
+				}
+			} else {
+				for _, dgst := range r.Digests() {
+					f, err := os.Open(fp)
+					if err != nil {
+						return fmt.Errorf("failure opening file for read %q: %v", resource.Path(), err)
+					}
+					compared, err := dgst.Algorithm().FromReader(f)
+					if err == nil && dgst != compared {
+						if err := c.checkoutFile(fp, r); err != nil {
+							return fmt.Errorf("error checking out file %q: %v", resource.Path(), err)
+						}
+						break
+					}
+					if err1 := f.Close(); err == nil {
+						err = err1
+					}
+					if err != nil {
+						return fmt.Errorf("error checking digest for %q: %v", resource.Path(), err)
+					}
+				}
+			}
 		}
-
-		if !fi.Mode().IsRegular() {
-			return fmt.Errorf("file %q should be a regular file, but is not", resource.Path())
-		}
-
-		// TODO(dmcgowan): Verify size and digest
-
 	case Directory:
 		if fi == nil {
 			if err := c.driver.Mkdir(fp, resource.Mode()); err != nil {
@@ -532,7 +603,13 @@ func (c *context) contain(p string) (string, error) {
 
 // digest returns the digest of the file at path p, relative to the root.
 func (c *context) digest(p string) (digest.Digest, error) {
-	return digestPath(c.driver, filepath.Join(c.root, p))
+	f, err := c.driver.Open(filepath.Join(c.root, p))
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	return c.digester.Digest(f)
 }
 
 // resolveXAttrs attempts to resolve the extended attributes for the resource
