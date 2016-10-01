@@ -77,6 +77,10 @@ type Resource struct {
 	Xattr map[string][]byte `protobuf:"bytes,12,rep,name=xattr" json:"xattr,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Ads stores one or more alternate data streams for the target resource.
 	Ads map[string][]byte `protobuf:"bytes,13,rep,name=ads" json:"ads,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Whiteout indicates this resource should not be applied and discard any
+	// resources with the same path previously encountered. If this resource
+	// is a directory, the directory should be created as opaque.
+	Whiteout bool `protobuf:"varint,14,opt,name=whiteout" json:"whiteout,omitempty"`
 }
 
 func (m *Resource) Reset()         { *m = Resource{} }

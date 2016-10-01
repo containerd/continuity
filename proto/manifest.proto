@@ -74,4 +74,8 @@ message Resource {
     // Ads stores one or more alternate data streams for the target resource.
     map<string, bytes> ads = 13;
 
+    // Whiteout indicates this resource should not be applied and discard any
+    // resources with the same path previously encountered. If this resource
+    // is a directory, the directory should be created as opaque.
+    bool whiteout = 14;
 }

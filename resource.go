@@ -207,8 +207,8 @@ type Directory interface {
 	Resource
 	XAttrer
 
-	// Directory is a no-op method to identify directory objects by interface.
-	Directory()
+	// IsOpaque returns whether or not the directory is marked as opaque
+	IsOpaque() bool
 }
 
 type SymLink interface {
@@ -235,6 +235,13 @@ type Device interface {
 
 	Major() uint64
 	Minor() uint64
+}
+
+type Whiteout interface {
+	Resource
+
+	// Whiteout is a no-op method to allow consistent resolution of Whiteout
+	Whiteout()
 }
 
 type resource struct {
@@ -339,21 +346,25 @@ func (rf *regularFile) XAttrs() map[string][]byte {
 
 type directory struct {
 	resource
+	opaque bool
 }
 
 var _ Directory = &directory{}
 
-func newDirectory(base resource) (Directory, error) {
+func newDirectory(base resource, opaque bool) (Directory, error) {
 	if !base.Mode().IsDir() {
 		return nil, fmt.Errorf("not a directory")
 	}
 
 	return &directory{
 		resource: base,
+		opaque:   opaque,
 	}, nil
 }
 
-func (d *directory) Directory() {}
+func (d *directory) IsOpaque() bool {
+	return d.opaque
+}
 
 func (d *directory) XAttrs() map[string][]byte {
 	xattrs := make(map[string][]byte, len(d.xattrs))
@@ -363,6 +374,28 @@ func (d *directory) XAttrs() map[string][]byte {
 	}
 
 	return xattrs
+}
+
+func removeOpaqueness(opq Directory) Directory {
+	if d, ok := opq.(*directory); ok {
+		return &directory{
+			resource: d.resource,
+			opaque:   false,
+		}
+	}
+
+	r, err := newBaseResource(opq.Path(), opq.Mode(), opq.UID(), opq.GID())
+	if err != nil {
+		// creating resource from a resource should not error
+		panic(err)
+	}
+
+	newDir, err := newDirectory(*r, false)
+	if err != nil {
+		// directory should never be able to be created invalid
+		panic(err)
+	}
+	return newDir
 }
 
 type symLink struct {
@@ -470,6 +503,34 @@ func (d device) Minor() uint64 {
 	return d.minor
 }
 
+type whiteout struct {
+	resource
+}
+
+var _ Whiteout = &whiteout{}
+
+func newWhiteout(base resource) (Whiteout, error) {
+	if base.Mode() == 0 {
+		return nil, fmt.Errorf("whiteout cannot have mode")
+	}
+
+	return &whiteout{
+		resource: base,
+	}, nil
+}
+
+func (*whiteout) Whiteout() {}
+
+func (wo *whiteout) XAttrs() map[string][]byte {
+	xattrs := make(map[string][]byte, len(wo.xattrs))
+
+	for attr, value := range wo.xattrs {
+		xattrs[attr] = append(xattrs[attr], value...)
+	}
+
+	return xattrs
+}
+
 // toProto converts a resource to a protobuf record. We'd like to push this
 // the individual types but we want to keep this all together during
 // prototyping.
@@ -493,6 +554,8 @@ func toProto(resource Resource) *pb.Resource {
 		for _, dgst := range r.Digests() {
 			b.Digest = append(b.Digest, dgst.String())
 		}
+	case Directory:
+		b.Whiteout = r.IsOpaque()
 	case SymLink:
 		b.Target = r.Target()
 	case Device:
@@ -500,6 +563,8 @@ func toProto(resource Resource) *pb.Resource {
 		b.Path = r.Paths()
 	case NamedPipe:
 		b.Path = r.Paths()
+	case Whiteout:
+		b.Whiteout = true
 	}
 
 	// enforce a few stability guarantees that may not be provided by the
@@ -523,6 +588,10 @@ func fromProto(b *pb.Resource) (Resource, error) {
 	}
 
 	switch {
+	case base.Mode().IsDir():
+		return newDirectory(*base, b.Whiteout)
+	case b.Whiteout:
+		return newWhiteout(*base)
 	case base.Mode().IsRegular():
 		dgsts := make([]digest.Digest, len(b.Digest))
 		for i, dgst := range b.Digest {
@@ -531,8 +600,6 @@ func fromProto(b *pb.Resource) (Resource, error) {
 		}
 
 		return newRegularFile(*base, b.Path, int64(b.Size), dgsts...)
-	case base.Mode().IsDir():
-		return newDirectory(*base)
 	case base.Mode()&os.ModeSymlink != 0:
 		return newSymLink(*base, b.Target)
 	case base.Mode()&os.ModeNamedPipe != 0:

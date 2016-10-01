@@ -34,20 +34,27 @@ type Context interface {
 // not under the given root.
 type SymlinkPath func(root, linkname, target string) (string, error)
 
+type WhiteoutChecker interface {
+	IsOpaque(Resource) bool
+	IsWhiteout(Resource) bool
+}
+
 type ContextOptions struct {
-	Digester Digester
-	Driver   Driver
-	Provider ContentProvider
+	Digester  Digester
+	Driver    Driver
+	Provider  ContentProvider
+	Whiteouts WhiteoutChecker
 }
 
 // context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	driver   Driver
-	root     string
-	digester Digester
-	provider ContentProvider
+	driver    Driver
+	root      string
+	digester  Digester
+	provider  ContentProvider
+	whiteouts WhiteoutChecker
 }
 
 // NewContext returns a Context associated with root. The default driver will
@@ -91,10 +98,11 @@ func NewContextWithOptions(root string, options ContextOptions) (Context, error)
 	}
 
 	return &context{
-		root:     root,
-		driver:   driver,
-		digester: digester,
-		provider: options.Provider,
+		root:      root,
+		driver:    driver,
+		digester:  digester,
+		provider:  options.Provider,
+		whiteouts: options.Whiteouts,
 	}, nil
 }
 
@@ -151,7 +159,17 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	if fi.Mode().IsDir() {
-		return newDirectory(*base)
+		// Check for opaqueness
+		var opaque bool
+		if c.whiteouts != nil {
+			opaque = c.whiteouts.IsOpaque(base)
+		}
+		return newDirectory(*base, opaque)
+	}
+
+	if c.whiteouts != nil && c.whiteouts.IsWhiteout(base) {
+		base.mode = 0
+		return newWhiteout(*base)
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 {
