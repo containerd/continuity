@@ -365,6 +365,14 @@ func (c *context) checkoutFile(fp string, rf RegularFile) error {
 	if c.provider == nil {
 		return fmt.Errorf("no file provider")
 	}
+	// If file has no digests, just create empty file
+	if len(rf.Digests()) == 0 {
+		f, err := os.Create(fp)
+		if err != nil {
+			return fmt.Errorf("unable to open file: %v", err)
+		}
+		return f.Close()
+	}
 	var (
 		r   io.ReadCloser
 		err error
@@ -463,8 +471,10 @@ func (c *context) Apply(resource Resource) error {
 		}
 
 		if target != r.Target() {
-			if err := c.driver.Remove(fp); err != nil { // RemoveAll?
-				return err
+			if fi != nil {
+				if err := c.driver.Remove(fp); err != nil { // RemoveAll?
+					return err
+				}
 			}
 
 			if err := c.driver.Symlink(r.Target(), fp); err != nil {
