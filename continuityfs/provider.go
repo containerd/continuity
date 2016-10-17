@@ -8,18 +8,13 @@ import (
 	"github.com/stevvooe/continuity"
 )
 
-type readSeekCloser interface {
-	io.ReadCloser
-	io.Seeker
-}
-
 // FileContentProvider is an object which is used to fetch
 // data and inode information about a path or digest.
 // TODO(dmcgowan): Update GetContentPath to provide a
 // filehandle or ReadWriteCloser.
 type FileContentProvider interface {
 	Path(string, digest.Digest) (string, error)
-	Open(string, digest.Digest) (readSeekCloser, error)
+	Open(string, digest.Digest) (io.ReadCloser, error)
 }
 
 type fsContentProvider struct {
@@ -41,6 +36,6 @@ func (p *fsContentProvider) Path(path string, dgst digest.Digest) (string, error
 	return filepath.Join(p.root, path), nil
 }
 
-func (p *fsContentProvider) Open(path string, dgst digest.Digest) (readSeekCloser, error) {
+func (p *fsContentProvider) Open(path string, dgst digest.Digest) (io.ReadCloser, error) {
 	return p.driver.Open(filepath.Join(p.root, path))
 }
