@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 )
 
 // TestUniqifyDigests ensures that we deterministically sort digest entries

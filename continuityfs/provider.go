@@ -4,7 +4,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/stevvooe/continuity"
 )
 

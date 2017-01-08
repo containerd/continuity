@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 	pb "github.com/stevvooe/continuity/proto"
 )
 

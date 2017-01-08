@@ -5,7 +5,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 )
 
 // Digester produces a digest for a given read stream
@@ -23,7 +23,7 @@ type simpleDigester struct {
 }
 
 func (sd simpleDigester) Digest(r io.Reader) (digest.Digest, error) {
-	digester := sd.algorithm.New()
+	digester := sd.algorithm.Digester()
 
 	if _, err := io.Copy(digester.Hash(), r); err != nil {
 		return "", err
