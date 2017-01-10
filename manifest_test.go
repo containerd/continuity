@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 )
 
 // Hard things:
