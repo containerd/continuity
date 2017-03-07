@@ -151,7 +151,7 @@ func TestWalkFS(t *testing.T) {
 	//	t.Fatalf("error verifying manifest: %v")
 	//}
 
-	expectedResources, err := expectedResourceList(testResources)
+	expectedResources, err := expectedResourceList(root, testResources)
 	if err != nil {
 		// TODO(dmcgowan): update function to panic, this would mean test setup error
 		t.Fatalf("error creating resource list: %v", err)
@@ -306,7 +306,7 @@ func randomBytes(p []byte) {
 
 // expectedResourceList sorts the set of resources into the order
 // expected in the manifest and collapses hardlinks
-func expectedResourceList(resources []dresource) ([]Resource, error) {
+func expectedResourceList(root string, resources []dresource) ([]Resource, error) {
 	resourceMap := map[string]Resource{}
 	paths := []string{}
 	for _, r := range resources {
@@ -362,7 +362,8 @@ func expectedResourceList(resources []dresource) ([]Resource, error) {
 		case rrelsymlink, rabssymlink:
 			targetPath := r.target
 			if r.kind == rabssymlink && !filepath.IsAbs(r.target) {
-				targetPath = "/" + targetPath
+				// for absolute links, we join with root.
+				targetPath = filepath.Join(root, targetPath)
 			}
 			s := &symLink{
 				resource: resource{
