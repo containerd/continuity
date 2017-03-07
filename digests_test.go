@@ -20,24 +20,24 @@ func TestUniqifyDigests(t *testing.T) {
 		{
 			description: "simple merge",
 			input: [][]digest.Digest{
-				[]digest.Digest{"sha1:abc", "sha256:def"},
-				[]digest.Digest{"sha1:abc", "sha256:def"},
+				{"sha1:abc", "sha256:def"},
+				{"sha1:abc", "sha256:def"},
 			},
 			expected: []digest.Digest{"sha1:abc", "sha256:def"},
 		},
 		{
 			description: "simple reversed order",
 			input: [][]digest.Digest{
-				[]digest.Digest{"sha1:abc", "sha256:def"},
-				[]digest.Digest{"sha256:def", "sha1:abc"},
+				{"sha1:abc", "sha256:def"},
+				{"sha256:def", "sha1:abc"},
 			},
 			expected: []digest.Digest{"sha1:abc", "sha256:def"},
 		},
 		{
 			description: "conflicting values for sha1",
 			input: [][]digest.Digest{
-				[]digest.Digest{"sha1:abc", "sha256:def"},
-				[]digest.Digest{"sha256:def", "sha1:def"},
+				{"sha1:abc", "sha256:def"},
+				{"sha256:def", "sha1:def"},
 			},
 			err: fmt.Errorf("conflicting digests for sha1 found"),
 		},

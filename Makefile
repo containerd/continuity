@@ -8,7 +8,8 @@ GO_LDFLAGS=-ldflags "-X `go list ./version`.Version=$(VERSION)"
 
 .PHONY: clean all fmt vet lint build test binaries setup
 .DEFAULT: default
-all: AUTHORS clean fmt vet fmt lint build test binaries
+# skip lint at the moment
+all: AUTHORS clean fmt vet fmt build test binaries
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
@@ -45,14 +46,15 @@ lint:
 
 build:
 	@echo "+ $@"
-	@go build -tags "${DOCKER_BUILDTAGS}" -v ${GO_LDFLAGS} ./...
+	@go build -v ${GO_LDFLAGS} ./...
 
 test:
 	@echo "+ $@"
-	@go test -tags "${DOCKER_BUILDTAGS}" ./...
+	@go test ./...
 
 binaries: ${PREFIX}/bin/continuity
 	@echo "+ $@"
+	@go build -o $< ${GO_LDFLAGS} ./cmd/continuity
 
 clean:
 	@echo "+ $@"

@@ -4,3 +4,8 @@ go:
   - 1.8
 
 go_import_path: github.com/stevvooe/continuity
+
+script:
+# TODO: vendor
+  - go get -t ./...
+  - make

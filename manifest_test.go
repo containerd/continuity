@@ -139,7 +139,7 @@ func TestWalkFS(t *testing.T) {
 
 	m, err := BuildManifest(ctx)
 	if err != nil {
-		t.Fatalf("error building manifest: %v, %#T", err, err)
+		t.Fatalf("error building manifest: %v", err)
 	}
 
 	var b bytes.Buffer
@@ -237,7 +237,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 			}
 		case rdirectory:
 			if err := os.Mkdir(p, resource.mode); err != nil {
-				t.Fatalf("error creating directory %q: %v", err)
+				t.Fatalf("error creating directory %q: %v", p, err)
 			}
 		case rhardlink:
 			target := filepath.Join(root, resource.target)
