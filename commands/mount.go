@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -30,14 +29,9 @@ var MountCmd = &cobra.Command{
 
 		manifestName := filepath.Base(manifest)
 
-		p, err := ioutil.ReadFile(manifest)
+		m, err := readManifest(manifest)
 		if err != nil {
-			log.Fatalf("error reading manifest: %v", err)
-		}
-
-		m, err := continuity.Unmarshal(p)
-		if err != nil {
-			log.Fatalf("error unmarshaling manifest: %v", err)
+			log.Fatal(err)
 		}
 
 		driver, err := continuity.NewSystemDriver()

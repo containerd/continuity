@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -11,6 +12,13 @@ import (
 var (
 	buildCmdConfig struct {
 		format string
+	}
+
+	marshalers = map[string]func(*continuity.Manifest) ([]byte, error){
+		"pb": continuity.Marshal,
+		continuity.MediaTypeManifestV0Protobuf: continuity.Marshal,
+		"json": continuity.MarshalJSON,
+		continuity.MediaTypeManifestV0JSON: continuity.MarshalJSON,
 	}
 
 	BuildCmd = &cobra.Command{
@@ -31,9 +39,15 @@ var (
 				log.Fatalf("error generating manifest: %v", err)
 			}
 
-			p, err := continuity.Marshal(m)
+			marshaler, ok := marshalers[buildCmdConfig.format]
+			if !ok {
+				log.Fatalf("unknown format %s", buildCmdConfig.format)
+			}
+
+			p, err := marshaler(m)
 			if err != nil {
-				log.Fatalf("error marshaling manifest: %v", err)
+				log.Fatalf("error marshalling manifest as %s: %v",
+					buildCmdConfig.format, err)
 			}
 
 			if _, err := os.Stdout.Write(p); err != nil {
@@ -44,5 +58,7 @@ var (
 )
 
 func init() {
-	BuildCmd.Flags().StringVar(&buildCmdConfig.format, "format", "pb", "specify the output format of the manifest")
+	BuildCmd.Flags().StringVar(&buildCmdConfig.format, "format", "pb",
+		fmt.Sprintf("specify the output format of the manifest (\"pb\"|%q|\"json\"|%q)",
+			continuity.MediaTypeManifestV0Protobuf, continuity.MediaTypeManifestV0JSON))
 }

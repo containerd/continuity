@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"io/ioutil"
 	"log"
 
 	"github.com/containerd/continuity"
@@ -18,14 +17,9 @@ var VerifyCmd = &cobra.Command{
 
 		root, path := args[0], args[1]
 
-		p, err := ioutil.ReadFile(path)
+		m, err := readManifest(path)
 		if err != nil {
-			log.Fatalf("error reading manifest: %v", err)
-		}
-
-		m, err := continuity.Unmarshal(p)
-		if err != nil {
-			log.Fatalf("error unmarshaling manifest: %v", err)
+			log.Fatal(err)
 		}
 
 		ctx, err := continuity.NewContext(root)
