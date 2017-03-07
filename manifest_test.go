@@ -1,13 +1,13 @@
 package continuity
 
 import (
+	"bytes"
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -142,7 +142,9 @@ func TestWalkFS(t *testing.T) {
 		t.Fatalf("error building manifest: %v, %#T", err, err)
 	}
 
-	MarshalText(os.Stdout, m)
+	var b bytes.Buffer
+	MarshalText(&b, m)
+	t.Log(b.String())
 
 	// TODO(dmcgowan): always verify, currently hard links not supported
 	//if err := VerifyManifest(ctx, m); err != nil {
@@ -160,10 +162,10 @@ func TestWalkFS(t *testing.T) {
 	if diff.HasDiff() {
 		t.Log("Resource list difference")
 		for _, a := range diff.Additions {
-			t.Logf("Unexpected resource: %#v", a, a)
+			t.Logf("Unexpected resource: %#v", a)
 		}
 		for _, d := range diff.Deletions {
-			t.Logf("Missing resource: %#v", d, d)
+			t.Logf("Missing resource: %#v", d)
 		}
 		for _, u := range diff.Updates {
 			t.Logf("Changed resource:\n\tExpected: %#v\n\tActual:   %#v", u.Original, u.Updated)
@@ -289,12 +291,11 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 		t.Fatalf("error walking created root: %v", err)
 	}
 
-	cmd := exec.Command("tree", root)
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("error running tree command: %v", err)
+	var b bytes.Buffer
+	if err := tree(&b, root); err != nil {
+		t.Fatalf("error running tree: %v", err)
 	}
-
+	t.Logf("\n%s", b.String())
 }
 
 func randomBytes(p []byte) {
