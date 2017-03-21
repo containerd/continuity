@@ -54,7 +54,6 @@ test:
 
 binaries: ${PREFIX}/bin/continuity
 	@echo "+ $@"
-	@go build -o $< ${GO_LDFLAGS} ./cmd/continuity
 
 clean:
 	@echo "+ $@"
