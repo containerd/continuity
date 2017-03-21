@@ -111,7 +111,7 @@ func Merge(fs ...Resource) (Resource, error) {
 		if xattrer, ok := f.(XAttrer); ok {
 			fxattrs := xattrer.XAttrs()
 			if !reflect.DeepEqual(fxattrs, xattrs) {
-				return nil, fmt.Errorf("resource %q xattrs do not match: %v != %v", fxattrs, xattrs)
+				return nil, fmt.Errorf("resource %q xattrs do not match: %v != %v", f, fxattrs, xattrs)
 			}
 		}
 

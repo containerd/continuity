@@ -1,13 +1,13 @@
 package continuity
 
 import (
+	"bytes"
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -139,17 +139,19 @@ func TestWalkFS(t *testing.T) {
 
 	m, err := BuildManifest(ctx)
 	if err != nil {
-		t.Fatalf("error building manifest: %v, %#T", err, err)
+		t.Fatalf("error building manifest: %v", err)
 	}
 
-	MarshalText(os.Stdout, m)
+	var b bytes.Buffer
+	MarshalText(&b, m)
+	t.Log(b.String())
 
 	// TODO(dmcgowan): always verify, currently hard links not supported
 	//if err := VerifyManifest(ctx, m); err != nil {
 	//	t.Fatalf("error verifying manifest: %v")
 	//}
 
-	expectedResources, err := expectedResourceList(testResources)
+	expectedResources, err := expectedResourceList(root, testResources)
 	if err != nil {
 		// TODO(dmcgowan): update function to panic, this would mean test setup error
 		t.Fatalf("error creating resource list: %v", err)
@@ -160,10 +162,10 @@ func TestWalkFS(t *testing.T) {
 	if diff.HasDiff() {
 		t.Log("Resource list difference")
 		for _, a := range diff.Additions {
-			t.Logf("Unexpected resource: %#v", a, a)
+			t.Logf("Unexpected resource: %#v", a)
 		}
 		for _, d := range diff.Deletions {
-			t.Logf("Missing resource: %#v", d, d)
+			t.Logf("Missing resource: %#v", d)
 		}
 		for _, u := range diff.Updates {
 			t.Logf("Changed resource:\n\tExpected: %#v\n\tActual:   %#v", u.Original, u.Updated)
@@ -235,7 +237,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 			}
 		case rdirectory:
 			if err := os.Mkdir(p, resource.mode); err != nil {
-				t.Fatalf("error creating directory %q: %v", err)
+				t.Fatalf("error creating directory %q: %v", p, err)
 			}
 		case rhardlink:
 			target := filepath.Join(root, resource.target)
@@ -289,12 +291,11 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 		t.Fatalf("error walking created root: %v", err)
 	}
 
-	cmd := exec.Command("tree", root)
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("error running tree command: %v", err)
+	var b bytes.Buffer
+	if err := tree(&b, root); err != nil {
+		t.Fatalf("error running tree: %v", err)
 	}
-
+	t.Logf("\n%s", b.String())
 }
 
 func randomBytes(p []byte) {
@@ -305,7 +306,7 @@ func randomBytes(p []byte) {
 
 // expectedResourceList sorts the set of resources into the order
 // expected in the manifest and collapses hardlinks
-func expectedResourceList(resources []dresource) ([]Resource, error) {
+func expectedResourceList(root string, resources []dresource) ([]Resource, error) {
 	resourceMap := map[string]Resource{}
 	paths := []string{}
 	for _, r := range resources {
@@ -361,7 +362,8 @@ func expectedResourceList(resources []dresource) ([]Resource, error) {
 		case rrelsymlink, rabssymlink:
 			targetPath := r.target
 			if r.kind == rabssymlink && !filepath.IsAbs(r.target) {
-				targetPath = "/" + targetPath
+				// for absolute links, we join with root.
+				targetPath = filepath.Join(root, targetPath)
 			}
 			s := &symLink{
 				resource: resource{
