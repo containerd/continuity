@@ -482,7 +482,17 @@ func toProto(resource Resource) *pb.Resource {
 	}
 
 	if xattrer, ok := resource.(XAttrer); ok {
-		b.Xattr = xattrer.XAttrs()
+		// Sorts the XAttrs by name for consistent ordering.
+		keys := []string{}
+		xattrs := xattrer.XAttrs()
+		for k := range xattrs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			b.Xattr = append(b.Xattr, &pb.XAttr{Name: k, Data: xattrs[k]})
+		}
 	}
 
 	switch r := resource.(type) {
@@ -518,8 +528,8 @@ func fromProto(b *pb.Resource) (Resource, error) {
 
 	base.xattrs = make(map[string][]byte, len(b.Xattr))
 
-	for attr, value := range b.Xattr {
-		base.xattrs[attr] = append(base.xattrs[attr], value...)
+	for _, attr:= range b.Xattr {
+		base.xattrs[attr.Name] = attr.Data
 	}
 
 	switch {

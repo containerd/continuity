@@ -11,13 +11,24 @@ It is generated from these files:
 It has these top-level messages:
 	Manifest
 	Resource
+	XAttr
 */
 package proto
 
 import proto1 "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto1.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto1.ProtoPackageIsVersion2 // please upgrade the proto package
 
 // Manifest specifies the entries in a container bundle, keyed and sorted by
 // path.
@@ -25,9 +36,10 @@ type Manifest struct {
 	Resource []*Resource `protobuf:"bytes,1,rep,name=resource" json:"resource,omitempty"`
 }
 
-func (m *Manifest) Reset()         { *m = Manifest{} }
-func (m *Manifest) String() string { return proto1.CompactTextString(m) }
-func (*Manifest) ProtoMessage()    {}
+func (m *Manifest) Reset()                    { *m = Manifest{} }
+func (m *Manifest) String() string            { return proto1.CompactTextString(m) }
+func (*Manifest) ProtoMessage()               {}
+func (*Manifest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 func (m *Manifest) GetResource() []*Resource {
 	if m != nil {
@@ -73,21 +85,92 @@ type Resource struct {
 	Major uint64 `protobuf:"varint,10,opt,name=major" json:"major,omitempty"`
 	// Minor specifies the minor device number for charactor and block devices.
 	Minor uint64 `protobuf:"varint,11,opt,name=minor" json:"minor,omitempty"`
-	// Xattr provides storage for extended attributes for the target resource.
-	Xattr map[string][]byte `protobuf:"bytes,12,rep,name=xattr" json:"xattr,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Ads stores one or more alternate data streams for the target resource.
 	Ads map[string][]byte `protobuf:"bytes,13,rep,name=ads" json:"ads,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Xattr provides storage for extended attributes for the target resource.
+	Xattr []*XAttr `protobuf:"bytes,14,rep,name=xattr" json:"xattr,omitempty"`
 }
 
-func (m *Resource) Reset()         { *m = Resource{} }
-func (m *Resource) String() string { return proto1.CompactTextString(m) }
-func (*Resource) ProtoMessage()    {}
+func (m *Resource) Reset()                    { *m = Resource{} }
+func (m *Resource) String() string            { return proto1.CompactTextString(m) }
+func (*Resource) ProtoMessage()               {}
+func (*Resource) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
-func (m *Resource) GetXattr() map[string][]byte {
+func (m *Resource) GetPath() []string {
 	if m != nil {
-		return m.Xattr
+		return m.Path
 	}
 	return nil
+}
+
+func (m *Resource) GetUid() string {
+	if m != nil {
+		return m.Uid
+	}
+	return ""
+}
+
+func (m *Resource) GetGid() string {
+	if m != nil {
+		return m.Gid
+	}
+	return ""
+}
+
+func (m *Resource) GetUser() string {
+	if m != nil {
+		return m.User
+	}
+	return ""
+}
+
+func (m *Resource) GetGroup() string {
+	if m != nil {
+		return m.Group
+	}
+	return ""
+}
+
+func (m *Resource) GetMode() uint32 {
+	if m != nil {
+		return m.Mode
+	}
+	return 0
+}
+
+func (m *Resource) GetSize() uint64 {
+	if m != nil {
+		return m.Size
+	}
+	return 0
+}
+
+func (m *Resource) GetDigest() []string {
+	if m != nil {
+		return m.Digest
+	}
+	return nil
+}
+
+func (m *Resource) GetTarget() string {
+	if m != nil {
+		return m.Target
+	}
+	return ""
+}
+
+func (m *Resource) GetMajor() uint64 {
+	if m != nil {
+		return m.Major
+	}
+	return 0
+}
+
+func (m *Resource) GetMinor() uint64 {
+	if m != nil {
+		return m.Minor
+	}
+	return 0
 }
 
 func (m *Resource) GetAds() map[string][]byte {
@@ -95,4 +178,71 @@ func (m *Resource) GetAds() map[string][]byte {
 		return m.Ads
 	}
 	return nil
+}
+
+func (m *Resource) GetXattr() []*XAttr {
+	if m != nil {
+		return m.Xattr
+	}
+	return nil
+}
+
+// XAttr encodes extended attributes for a resource.
+type XAttr struct {
+	// Name specifies the attribute name.
+	Name string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	// Data specifies the associated data for the attribute.
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (m *XAttr) Reset()                    { *m = XAttr{} }
+func (m *XAttr) String() string            { return proto1.CompactTextString(m) }
+func (*XAttr) ProtoMessage()               {}
+func (*XAttr) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *XAttr) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
+func (m *XAttr) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
+func init() {
+	proto1.RegisterType((*Manifest)(nil), "proto.Manifest")
+	proto1.RegisterType((*Resource)(nil), "proto.Resource")
+	proto1.RegisterType((*XAttr)(nil), "proto.XAttr")
+}
+
+func init() { proto1.RegisterFile("manifest.proto", fileDescriptor0) }
+
+var fileDescriptor0 = []byte{
+	// 336 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x5c, 0x90, 0x4f, 0x4b, 0xeb, 0x40,
+	0x14, 0xc5, 0x49, 0x93, 0xf4, 0xa5, 0xb7, 0x7f, 0x5e, 0x19, 0x1e, 0xe5, 0xf2, 0x56, 0x21, 0xab,
+	0xa0, 0x50, 0x41, 0x41, 0xc5, 0x5d, 0x05, 0x37, 0x82, 0x9b, 0x59, 0xb9, 0x1d, 0x9d, 0x31, 0xc6,
+	0x9a, 0x4c, 0x99, 0x99, 0x88, 0xf5, 0x03, 0xf8, 0xb9, 0x65, 0xee, 0x4c, 0xbb, 0x70, 0x95, 0x73,
+	0x7e, 0xf7, 0xdc, 0xc9, 0xe5, 0xc0, 0xa2, 0x13, 0x7d, 0xfb, 0xa2, 0xac, 0x5b, 0xef, 0x8c, 0x76,
+	0x9a, 0xe5, 0xf4, 0xa9, 0xae, 0xa0, 0x78, 0x88, 0x03, 0x76, 0x0a, 0x85, 0x51, 0x56, 0x0f, 0xe6,
+	0x59, 0x61, 0x52, 0xa6, 0xf5, 0xf4, 0xfc, 0x6f, 0x08, 0xaf, 0x79, 0xc4, 0xfc, 0x18, 0xa8, 0xbe,
+	0x53, 0x28, 0x0e, 0x98, 0x31, 0xc8, 0x76, 0xc2, 0xbd, 0xd2, 0xd6, 0x84, 0x93, 0x66, 0x4b, 0x48,
+	0x87, 0x56, 0xe2, 0xa8, 0x4c, 0xea, 0x09, 0xf7, 0xd2, 0x93, 0xa6, 0x95, 0x98, 0x06, 0xd2, 0xb4,
+	0x92, 0xad, 0x20, 0x1b, 0xac, 0x32, 0x98, 0x79, 0x74, 0x3b, 0xc2, 0x84, 0x93, 0x67, 0x08, 0x79,
+	0x63, 0xf4, 0xb0, 0xc3, 0xfc, 0x38, 0x08, 0xc0, 0xff, 0xa9, 0xd3, 0x52, 0xe1, 0xb8, 0x4c, 0xea,
+	0x39, 0x27, 0xed, 0x99, 0x6d, 0xbf, 0x14, 0xfe, 0x29, 0x93, 0x3a, 0xe3, 0xa4, 0xd9, 0x0a, 0xc6,
+	0xb2, 0x6d, 0x94, 0x75, 0x58, 0xd0, 0x4d, 0xd1, 0x79, 0xee, 0x84, 0x69, 0x94, 0xc3, 0x09, 0x9d,
+	0x11, 0x1d, 0xfb, 0x07, 0x79, 0x27, 0xde, 0xb4, 0x41, 0xa0, 0x47, 0x82, 0x21, 0xda, 0xf6, 0xda,
+	0xe0, 0x34, 0x52, 0x6f, 0xd8, 0x09, 0xa4, 0x42, 0x5a, 0x9c, 0x53, 0x45, 0xf8, 0xab, 0xa2, 0xf5,
+	0x46, 0xda, 0xbb, 0xde, 0x99, 0x3d, 0xf7, 0x21, 0x56, 0x41, 0xfe, 0x29, 0x9c, 0x33, 0xb8, 0xa0,
+	0xf4, 0x2c, 0xa6, 0x1f, 0x37, 0xce, 0x19, 0x1e, 0x46, 0xff, 0x2f, 0xa1, 0x38, 0x2c, 0xf9, 0x8e,
+	0xb6, 0x6a, 0x8f, 0x49, 0xe8, 0x68, 0xab, 0xf6, 0xfe, 0x86, 0x0f, 0xf1, 0x3e, 0x28, 0x6a, 0x72,
+	0xc6, 0x83, 0xb9, 0x19, 0x5d, 0x27, 0xf7, 0x59, 0x31, 0x5b, 0xce, 0xab, 0x33, 0xc8, 0xe9, 0x35,
+	0x5f, 0x43, 0x2f, 0x3a, 0x15, 0x77, 0x49, 0x7b, 0x26, 0x85, 0x13, 0x71, 0x97, 0xf4, 0xd3, 0x98,
+	0x4e, 0xb8, 0xf8, 0x09, 0x00, 0x00, 0xff, 0xff, 0xe1, 0x62, 0xa4, 0xdd, 0x12, 0x02, 0x00, 0x00,
 }
