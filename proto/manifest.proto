@@ -9,8 +9,6 @@ message Manifest {
 }
 
 message Resource {
-    reserved 12;
-
     // Path specifies the path from the bundle root. If more than one
     // path is present, the entry may represent a hardlink, rather than using
     // a link target. The path format is operating system specific.
@@ -61,11 +59,11 @@ message Resource {
     // Minor specifies the minor device number for charactor and block devices.
     uint64 minor = 11;
 
-    // Ads stores one or more alternate data streams for the target resource.
-    map<string, bytes> ads = 13;
-
     // Xattr provides storage for extended attributes for the target resource.
-    repeated XAttr xattr = 14;
+    repeated XAttr xattr = 12;
+
+    // Ads stores one or more alternate data streams for the target resource.
+    repeated ADSEntry ads = 13;
 
 }
 
@@ -75,5 +73,14 @@ message XAttr {
     string name = 1;
 
     // Data specifies the associated data for the attribute.
+    bytes data = 2;
+}
+
+// ADSEntry encodes information for a Windows Alternate Data Stream.
+message ADSEntry {
+    // Name specifices the stream name.
+    string name = 1;
+
+    // Data specifies the stream data.
     bytes data = 2;
 }
