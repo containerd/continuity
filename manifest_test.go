@@ -315,7 +315,7 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 			absPath = "/" + absPath
 		}
 		uidStr := strconv.Itoa(r.uid)
-		gidStr := strconv.Itoa(r.uid)
+		gidStr := strconv.Itoa(r.gid)
 		switch r.kind {
 		case rfile:
 			f := &regularFile{
