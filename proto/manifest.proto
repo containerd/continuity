@@ -82,5 +82,16 @@ message ADSEntry {
     string name = 1;
 
     // Data specifies the stream data.
+    // See also the description about the digest below.
     bytes data = 2;
+
+    // Digest is a CAS representation of the stream data.
+    //
+    // At least one of data or digest MUST be specified, and either one of them
+    // SHOULD be specified.
+    //
+    // How to access the actual data using the digest is implementation-specific,
+    // and implementations can choose not to implement digest.
+    // So, digest SHOULD be used only when the stream data is large.
+    string digest = 3;
 }
