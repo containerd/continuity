@@ -463,8 +463,10 @@ func (c *context) Apply(resource Resource) error {
 		}
 
 		if target != r.Target() {
-			if err := c.driver.Remove(fp); err != nil { // RemoveAll?
-				return err
+			if fi != nil {
+				if err := c.driver.Remove(fp); err != nil { // RemoveAll in case of directory?
+					return err
+				}
 			}
 
 			if err := c.driver.Symlink(r.Target(), fp); err != nil {
