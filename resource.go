@@ -246,22 +246,6 @@ type resource struct {
 
 var _ Resource = &resource{}
 
-// newBaseResource returns a *resource, populated with data from p and fi,
-// where p will be populated directly.
-func newBaseResource(p string, mode os.FileMode, uid, gid string) (*resource, error) {
-	return &resource{
-		paths: []string{p},
-		mode:  mode,
-
-		uid: uid,
-		gid: gid,
-
-		// NOTE(stevvooe): Population of shared xattrs field is deferred to
-		// the resource types that populate it. Since they are a property of
-		// the context, they must set there.
-	}, nil
-}
-
 func (r *resource) Path() string {
 	if len(r.paths) < 1 {
 		return ""
@@ -521,14 +505,16 @@ func toProto(resource Resource) *pb.Resource {
 
 // fromProto converts from a protobuf Resource to a Resource interface.
 func fromProto(b *pb.Resource) (Resource, error) {
-	base, err := newBaseResource(b.Path[0], os.FileMode(b.Mode), b.Uid, b.Gid)
-	if err != nil {
-		return nil, err
+	base := &resource{
+		paths: b.Path,
+		mode:  os.FileMode(b.Mode),
+		uid:   b.Uid,
+		gid:   b.Gid,
 	}
 
 	base.xattrs = make(map[string][]byte, len(b.Xattr))
 
-	for _, attr:= range b.Xattr {
+	for _, attr := range b.Xattr {
 		base.xattrs[attr.Name] = attr.Data
 	}
 
