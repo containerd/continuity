@@ -7,6 +7,10 @@ go:
 
 go_import_path: github.com/stevvooe/continuity
 
+env:
+  - GOOS=windows
+  - GOOS=linux
+
 script:
 # TODO: vendor
   - go get -t ./...
