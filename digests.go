@@ -1,6 +1,7 @@
 package continuity
 
 import (
+	ctxu "context"
 	"fmt"
 	"io"
 	"sort"
@@ -10,26 +11,22 @@ import (
 
 // Digester produces a digest for a given read stream
 type Digester interface {
-	Digest(io.Reader) (digest.Digest, error)
+	Digest(ctxu.Context, io.Reader) (digest.Digest, error)
 }
 
-// ContentProvider produces a read stream for a given digest
+// ContentProvider provides content for a digest.
 type ContentProvider interface {
-	Reader(digest.Digest) (io.ReadCloser, error)
+	// Reader returns a stream of the content for
+	// the provided digest.
+	Reader(ctxu.Context, digest.Digest) (io.ReadCloser, error)
 }
 
 type simpleDigester struct {
 	algorithm digest.Algorithm
 }
 
-func (sd simpleDigester) Digest(r io.Reader) (digest.Digest, error) {
-	digester := sd.algorithm.Digester()
-
-	if _, err := io.Copy(digester.Hash(), r); err != nil {
-		return "", err
-	}
-
-	return digester.Digest(), nil
+func (sd simpleDigester) Digest(ctx ctxu.Context, r io.Reader) (digest.Digest, error) {
+	return sd.algorithm.FromReader(r)
 }
 
 // uniqifyDigests sorts and uniqifies the provided digest, ensuring that the

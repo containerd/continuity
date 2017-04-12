@@ -14,21 +14,11 @@ func atomicWriteFile(filename string, r io.Reader, rf RegularFile) error {
 	if err != nil {
 		return err
 	}
-	err = os.Chmod(f.Name(), rf.Mode())
-	if err != nil {
+	if err := copyFileContent(f, r, rf.Size()); err != nil {
 		f.Close()
 		return err
 	}
-	n, err := io.Copy(f, r)
-	if err == nil && n < rf.Size() {
-		f.Close()
-		return io.ErrShortWrite
-	}
-	if err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
+	if err = os.Chmod(f.Name(), rf.Mode()); err != nil {
 		f.Close()
 		return err
 	}
@@ -36,4 +26,29 @@ func atomicWriteFile(filename string, r io.Reader, rf RegularFile) error {
 		return err
 	}
 	return os.Rename(f.Name(), filename)
+}
+
+func copyFileContent(dst *os.File, r io.Reader, size int64) error {
+	n, err := fastCopy(dst, r, size)
+	if err != nil {
+		return err
+	}
+	if n < size {
+		if n > 0 {
+			return io.ErrShortWrite
+		}
+		n, err = io.Copy(dst, r)
+		if err == nil && n < size {
+			return io.ErrShortWrite
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := dst.Sync(); err != nil {
+		return err
+	}
+
+	return nil
 }
