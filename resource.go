@@ -528,7 +528,7 @@ func fromProto(b *pb.Resource) (Resource, error) {
 
 	base.xattrs = make(map[string][]byte, len(b.Xattr))
 
-	for _, attr:= range b.Xattr {
+	for _, attr := range b.Xattr {
 		base.xattrs[attr.Name] = attr.Data
 	}
 

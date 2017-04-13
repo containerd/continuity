@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	errNotAHardLink = fmt.Errorf("invalid hardlink")
+	errNotAHardLink           = fmt.Errorf("invalid hardlink")
+	errNotHardLinkImplemented = fmt.Errorf("hardlink not implemented")
 )
 
 type hardlinkManager struct {

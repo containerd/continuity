@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"syscall"
 	"testing"
 
 	"github.com/opencontainers/go-digest"
@@ -267,8 +266,13 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 		if err != nil {
 			t.Fatalf("error statting after creation: %v", err)
 		}
-		resources[i].uid = int(st.Sys().(*syscall.Stat_t).Uid)
-		resources[i].gid = int(st.Sys().(*syscall.Stat_t).Gid)
+
+		uid, gid, err := getUidGidFromFileInfo(st)
+		if err != nil {
+			t.Fatalf("error getting Uid/Gid: %v", err)
+		}
+		resources[i].uid = int(uid)
+		resources[i].gid = int(gid)
 		resources[i].mode = st.Mode()
 
 		// TODO: Readback and join xattr
