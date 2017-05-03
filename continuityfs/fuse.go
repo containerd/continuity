@@ -13,7 +13,7 @@ import (
 	"bazil.org/fuse/fs"
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/go-digest"
-	"github.com/stevvooe/continuity"
+	"github.com/containerd/continuity"
 	"golang.org/x/net/context"
 )
 

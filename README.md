@@ -1,7 +1,7 @@
 # continuity
 
-[![GoDoc](https://godoc.org/github.com/stevvooe/continuity?status.svg)](https://godoc.org/github.com/stevvooe/continuity)
-[![Build Status](https://travis-ci.org/stevvooe/continuity.svg?branch=master)](https://travis-ci.org/stevvooe/continuity)
+[![GoDoc](https://godoc.org/github.com/containerd/continuity?status.svg)](https://godoc.org/github.com/containerd/continuity)
+[![Build Status](https://travis-ci.org/containerd/continuity.svg?branch=master)](https://travis-ci.org/containerd/continuity)
 
 A transport-agnostic, filesystem metadata manifest system
 

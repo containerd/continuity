@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/stevvooe/continuity/sysx"
+	"github.com/containerd/continuity/sysx"
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {

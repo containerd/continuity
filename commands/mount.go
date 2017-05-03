@@ -14,8 +14,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/stevvooe/continuity"
-	"github.com/stevvooe/continuity/continuityfs"
+	"github.com/containerd/continuity"
+	"github.com/containerd/continuity/continuityfs"
 )
 
 var MountCmd = &cobra.Command{
