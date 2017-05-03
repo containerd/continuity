@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
-	pb "github.com/stevvooe/continuity/proto"
+	pb "github.com/containerd/continuity/proto"
 )
 
 var (

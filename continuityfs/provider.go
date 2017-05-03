@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/stevvooe/continuity"
+	"github.com/containerd/continuity"
 )
 
 // FileContentProvider is an object which is used to fetch

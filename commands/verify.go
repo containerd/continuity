@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
-	"github.com/stevvooe/continuity"
+	"github.com/containerd/continuity"
 )
 
 var VerifyCmd = &cobra.Command{
