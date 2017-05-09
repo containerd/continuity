@@ -4,8 +4,8 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/spf13/cobra"
 	"github.com/containerd/continuity"
+	"github.com/spf13/cobra"
 )
 
 var ApplyCmd = &cobra.Command{

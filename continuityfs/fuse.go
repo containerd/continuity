@@ -12,8 +12,8 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"github.com/Sirupsen/logrus"
-	"github.com/opencontainers/go-digest"
 	"github.com/containerd/continuity"
+	"github.com/opencontainers/go-digest"
 	"golang.org/x/net/context"
 )
 
