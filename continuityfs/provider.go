@@ -4,8 +4,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/opencontainers/go-digest"
 	"github.com/containerd/continuity"
+	"github.com/opencontainers/go-digest"
 )
 
 // FileContentProvider is an object which is used to fetch

@@ -13,9 +13,9 @@ import (
 	"bazil.org/fuse/fs"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"github.com/containerd/continuity"
 	"github.com/containerd/continuity/continuityfs"
+	"github.com/spf13/cobra"
 )
 
 var MountCmd = &cobra.Command{
