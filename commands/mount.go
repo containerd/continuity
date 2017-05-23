@@ -15,6 +15,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containerd/continuity"
 	"github.com/containerd/continuity/continuityfs"
+	"github.com/containerd/continuity/fsdriver"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +41,7 @@ var MountCmd = &cobra.Command{
 			log.Fatalf("error unmarshaling manifest: %v", err)
 		}
 
-		driver, err := continuity.NewSystemDriver()
+		driver, err := fsdriver.NewSystemDriver(fsdriver.Basic)
 		if err != nil {
 			logrus.Fatal(err)
 		}
