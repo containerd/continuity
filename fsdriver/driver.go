@@ -7,6 +7,20 @@ import (
 	"github.com/containerd/continuity/common"
 )
 
+type DriverType int
+
+const (
+	// Basic is essentially a wrapper around the golang os package.
+	// LOW is the Linux on Windows driver that lets the user manipulate remote
+	// Linux filesystem files on Windows.
+	Basic DriverType = iota
+	LOW
+)
+
+// BasicDriver is exported as a global since it's just a wrapper around
+// the os + filepath functions, so it has no internal state.
+var BasicDriver Driver = &basicDriver{}
+
 // Driver provides all of the system-level functions in a common interface.
 // The context should call these with full paths and should never use the `os`
 // package or any other package to access resources on the filesystem. This
@@ -51,6 +65,8 @@ type Driver interface {
 
 // Unfortunately, os.File is a struct instead of an interface, an interface
 // has to be manually defined.
+var _ File = &os.File{}
+
 type File interface {
 	Chdir() error
 	Chmod(mode os.FileMode) error
@@ -71,26 +87,13 @@ type File interface {
 	WriteString(s string) (n int, err error)
 }
 
-// Checks if os.File implements the File interface (but not the otherway around)
-var _ File = &os.File{}
-
-type DriverType int
-
-const (
-	// Basic is essentially a wrapper around the golang os package.
-	// LOW is the Linux on Windows driver that lets the user manipulate remote
-	// Linux filesystem files on Windows.
-	Basic DriverType = iota
-	LOW
-)
-
 func NewSystemDriver(driverType DriverType) (Driver, error) {
 	// TODO(stevvooe): Consider having this take a "hint" path argument, which
 	// would be the context root. The hint could be used to resolve required
 	// filesystem support when assembling the driver to use.
 	switch driverType {
 	case Basic:
-		return &basicDriver{}, nil
+		return BasicDriver, nil
 	case LOW:
 		if runtime.GOOS != "windows" {
 			return nil, common.ErrNotSupported

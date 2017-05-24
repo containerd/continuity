@@ -13,11 +13,11 @@ import (
 	"github.com/containerd/continuity/sysx"
 )
 
-func (d *basicDriver) Mknod(path string, mode os.FileMode, major, minor int) error {
+func (*basicDriver) Mknod(path string, mode os.FileMode, major, minor int) error {
 	return devices.Mknod(path, mode, major, minor)
 }
 
-func (d *basicDriver) Mkfifo(path string, mode os.FileMode) error {
+func (*basicDriver) Mkfifo(path string, mode os.FileMode) error {
 	if mode&os.ModeNamedPipe == 0 {
 		return errors.New("mode passed to Mkfifo does not have the named pipe bit set")
 	}
@@ -27,7 +27,7 @@ func (d *basicDriver) Mkfifo(path string, mode os.FileMode) error {
 }
 
 // Lchmod changes the mode of an file not following symlinks.
-func (d *basicDriver) Lchmod(path string, mode os.FileMode) (err error) {
+func (*basicDriver) Lchmod(path string, mode os.FileMode) (err error) {
 	if !filepath.IsAbs(path) {
 		path, err = filepath.Abs(path)
 		if err != nil {
@@ -39,7 +39,7 @@ func (d *basicDriver) Lchmod(path string, mode os.FileMode) (err error) {
 }
 
 // Getxattr returns all of the extended attributes for the file at path p.
-func (d *basicDriver) Getxattr(p string) (map[string][]byte, error) {
+func (*basicDriver) Getxattr(p string) (map[string][]byte, error) {
 	xattrs, err := sysx.Listxattr(p)
 	if err != nil {
 		return nil, fmt.Errorf("listing %s xattrs: %v", p, err)
@@ -67,7 +67,7 @@ func (d *basicDriver) Getxattr(p string) (map[string][]byte, error) {
 // any symbolic links, if necessary. All attributes on the target are
 // replaced by the values from attr. If the operation fails to set any
 // attribute, those already applied will not be rolled back.
-func (d *basicDriver) Setxattr(path string, attrMap map[string][]byte) error {
+func (*basicDriver) Setxattr(path string, attrMap map[string][]byte) error {
 	for attr, value := range attrMap {
 		if err := sysx.Setxattr(path, attr, value, 0); err != nil {
 			return fmt.Errorf("error setting xattr %q on %s: %v", attr, path, err)
@@ -79,7 +79,7 @@ func (d *basicDriver) Setxattr(path string, attrMap map[string][]byte) error {
 
 // LGetxattr returns all of the extended attributes for the file at path p
 // not following symbolic links.
-func (d *basicDriver) LGetxattr(p string) (map[string][]byte, error) {
+func (*basicDriver) LGetxattr(p string) (map[string][]byte, error) {
 	xattrs, err := sysx.LListxattr(p)
 	if err != nil {
 		return nil, fmt.Errorf("listing %s xattrs: %v", p, err)
@@ -107,7 +107,7 @@ func (d *basicDriver) LGetxattr(p string) (map[string][]byte, error) {
 // following any symbolic links. All attributes on the target are
 // replaced by the values from attr. If the operation fails to set any
 // attribute, those already applied will not be rolled back.
-func (d *basicDriver) LSetxattr(path string, attrMap map[string][]byte) error {
+func (*basicDriver) LSetxattr(path string, attrMap map[string][]byte) error {
 	for attr, value := range attrMap {
 		if err := sysx.LSetxattr(path, attr, value, 0); err != nil {
 			return fmt.Errorf("error setting xattr %q on %s: %v", attr, path, err)
@@ -117,6 +117,6 @@ func (d *basicDriver) LSetxattr(path string, attrMap map[string][]byte) error {
 	return nil
 }
 
-func (d *basicDriver) DeviceInfo(fi os.FileInfo) (maj uint64, min uint64, err error) {
+func (*basicDriver) DeviceInfo(fi os.FileInfo) (maj uint64, min uint64, err error) {
 	return devices.DeviceInfo(fi)
 }

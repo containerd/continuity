@@ -13,23 +13,23 @@ type basicDriver struct{}
 
 var _ Driver = &basicDriver{}
 
-func (d *basicDriver) Open(p string) (File, error) {
+func (*basicDriver) Open(p string) (File, error) {
 	return os.Open(p)
 }
 
-func (d *basicDriver) Stat(p string) (os.FileInfo, error) {
+func (*basicDriver) Stat(p string) (os.FileInfo, error) {
 	return os.Stat(p)
 }
 
-func (d *basicDriver) Lstat(p string) (os.FileInfo, error) {
+func (*basicDriver) Lstat(p string) (os.FileInfo, error) {
 	return os.Lstat(p)
 }
 
-func (d *basicDriver) Readlink(p string) (string, error) {
+func (*basicDriver) Readlink(p string) (string, error) {
 	return os.Readlink(p)
 }
 
-func (d *basicDriver) Mkdir(p string, mode os.FileMode) error {
+func (*basicDriver) Mkdir(p string, mode os.FileMode) error {
 	return os.Mkdir(p, mode)
 }
 
@@ -39,15 +39,15 @@ func (d *basicDriver) Mkdir(p string, mode os.FileMode) error {
 // function. If explicit unlinking or directory removal
 // to mirror system call is required, they should be
 // split up at that time.
-func (d *basicDriver) Remove(path string) error {
+func (*basicDriver) Remove(path string) error {
 	return os.Remove(path)
 }
 
-func (d *basicDriver) Link(oldname, newname string) error {
+func (*basicDriver) Link(oldname, newname string) error {
 	return os.Link(oldname, newname)
 }
 
-func (d *basicDriver) Lchown(name, uidStr, gidStr string) error {
+func (*basicDriver) Lchown(name, uidStr, gidStr string) error {
 	uid, err := strconv.Atoi(uidStr)
 	if err != nil {
 		return err
@@ -59,34 +59,34 @@ func (d *basicDriver) Lchown(name, uidStr, gidStr string) error {
 	return os.Lchown(name, uid, gid)
 }
 
-func (d *basicDriver) Symlink(oldname, newname string) error {
+func (*basicDriver) Symlink(oldname, newname string) error {
 	return os.Symlink(oldname, newname)
 }
 
-func (d *basicDriver) Join(pathName ...string) string {
+func (*basicDriver) Join(pathName ...string) string {
 	return filepath.Join(pathName...)
 }
 
-func (d *basicDriver) IsAbs(pathName string) bool {
+func (*basicDriver) IsAbs(pathName string) bool {
 	return filepath.IsAbs(pathName)
 }
 
-func (d *basicDriver) Rel(base, target string) (string, error) {
+func (*basicDriver) Rel(base, target string) (string, error) {
 	return filepath.Rel(base, target)
 }
 
-func (d *basicDriver) Base(pathName string) string {
+func (*basicDriver) Base(pathName string) string {
 	return filepath.Base(pathName)
 }
 
-func (d *basicDriver) Dir(pathName string) string {
+func (*basicDriver) Dir(pathName string) string {
 	return filepath.Dir(pathName)
 }
 
-func (d *basicDriver) Clean(pathName string) string {
+func (*basicDriver) Clean(pathName string) string {
 	return filepath.Clean(pathName)
 }
 
-func (d *basicDriver) Split(pathName string) (dir, file string) {
+func (*basicDriver) Split(pathName string) (dir, file string) {
 	return filepath.Split(pathName)
 }
