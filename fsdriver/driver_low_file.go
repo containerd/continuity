@@ -4,7 +4,9 @@ import (
 	"os"
 )
 
-// Have this for now.
+// Have this for now. Don't actually need these functions
+// due to struct embedding, but they're going to be added
+// anyway in the real implementation.
 type lowFile struct {
 	*os.File
 }

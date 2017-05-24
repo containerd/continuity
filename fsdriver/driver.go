@@ -38,11 +38,14 @@ type Driver interface {
 	// NOTE(stevvooe): We may want to actually include the path manipulation
 	// functions here, as well. They have been listed below to make the
 	// discovery process easier.
-
-	// Join(path ...string) string
-	// IsAbs(string) bool
-	// Abs(string) (string, error)
-	// Rel(base, target string) (string, error)
+	Join(pathName ...string) string
+	IsAbs(pathName string) bool
+	Rel(base, target string) (string, error)
+	Base(pathName string) string
+	Dir(pathName string) string
+	Clean(pathName string) string
+	Split(pathName string) (dir, file string)
+	// Abs(pathName string) (string, error)
 	// Walk(string, filepath.WalkFunc) error
 }
 

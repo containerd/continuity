@@ -2,6 +2,7 @@ package fsdriver
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -60,4 +61,32 @@ func (d *basicDriver) Lchown(name, uidStr, gidStr string) error {
 
 func (d *basicDriver) Symlink(oldname, newname string) error {
 	return os.Symlink(oldname, newname)
+}
+
+func (d *basicDriver) Join(pathName ...string) string {
+	return filepath.Join(pathName...)
+}
+
+func (d *basicDriver) IsAbs(pathName string) bool {
+	return filepath.IsAbs(pathName)
+}
+
+func (d *basicDriver) Rel(base, target string) (string, error) {
+	return filepath.Rel(base, target)
+}
+
+func (d *basicDriver) Base(pathName string) string {
+	return filepath.Base(pathName)
+}
+
+func (d *basicDriver) Dir(pathName string) string {
+	return filepath.Dir(pathName)
+}
+
+func (d *basicDriver) Clean(pathName string) string {
+	return filepath.Clean(pathName)
+}
+
+func (d *basicDriver) Split(pathName string) (dir, file string) {
+	return filepath.Split(pathName)
 }
