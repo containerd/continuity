@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"syscall"
 
 	"bazil.org/fuse"
@@ -35,22 +34,12 @@ func NewFile(inode uint64, provider FileContentProvider) *File {
 }
 
 func (f *File) setResource(r continuity.Resource) (err error) {
-	f.uid, err = parseUint32(r.UID())
-	if err != nil {
-		return
-	}
-	f.gid, err = parseUint32(r.GID())
-	if err != nil {
-		return
-	}
+	// TODO: error out if uid excesses uint32?
+	f.uid = uint32(r.UID())
+	f.gid = uint32(r.GID())
 	f.resource = r
 
 	return
-}
-
-func parseUint32(s string) (uint32, error) {
-	i, err := strconv.ParseUint(s, 10, 32)
-	return uint32(i), err
 }
 
 // Attr sets the fuse attribute for the file
@@ -215,14 +204,8 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 }
 
 func (d *Dir) setResource(r continuity.Resource) (err error) {
-	d.uid, err = parseUint32(r.UID())
-	if err != nil {
-		return
-	}
-	d.gid, err = parseUint32(r.GID())
-	if err != nil {
-		return
-	}
+	d.uid = uint32(r.UID())
+	d.gid = uint32(r.GID())
 	d.resource = r
 
 	return
