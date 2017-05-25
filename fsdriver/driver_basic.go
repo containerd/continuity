@@ -90,3 +90,13 @@ func (*basicDriver) Clean(pathName string) string {
 func (*basicDriver) Split(pathName string) (dir, file string) {
 	return filepath.Split(pathName)
 }
+
+func (*basicDriver) Separator() byte {
+	return filepath.Separator
+}
+
+func (*basicDriver) NormalizePath(pathName string) string {
+	// Windows accepts '/' as a path separator, so turn those to '\'
+	// Noops on other platforms.
+	return filepath.FromSlash(pathName)
+}

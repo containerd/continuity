@@ -59,6 +59,8 @@ type Driver interface {
 	Dir(pathName string) string
 	Clean(pathName string) string
 	Split(pathName string) (dir, file string)
+	Separator() byte
+	NormalizePath(pathName string) string
 	// Abs(pathName string) (string, error)
 	// Walk(string, filepath.WalkFunc) error
 }

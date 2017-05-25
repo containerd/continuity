@@ -90,3 +90,11 @@ func (d *lowDriver) Clean(pathName string) string {
 func (d *lowDriver) Split(pathName string) (dir, file string) {
 	return path.Split(pathName)
 }
+
+func (d *lowDriver) Separator() byte {
+	return '/'
+}
+
+func (d *lowDriver) NormalizePath(pathName string) string {
+	return pathName
+}
