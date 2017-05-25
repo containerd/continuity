@@ -3,7 +3,6 @@ package fsdriver
 import (
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 // basicDriver is a simple default implementation that sends calls out to the "os"
@@ -47,16 +46,9 @@ func (*basicDriver) Link(oldname, newname string) error {
 	return os.Link(oldname, newname)
 }
 
-func (*basicDriver) Lchown(name, uidStr, gidStr string) error {
-	uid, err := strconv.Atoi(uidStr)
-	if err != nil {
-		return err
-	}
-	gid, err := strconv.Atoi(gidStr)
-	if err != nil {
-		return err
-	}
-	return os.Lchown(name, uid, gid)
+func (*basicDriver) Lchown(name string, uid, gid int64) error {
+	// TODO: error out if uid excesses int bit width?
+	return os.Lchown(name, int(uid), int(gid))
 }
 
 func (*basicDriver) Symlink(oldname, newname string) error {

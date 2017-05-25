@@ -2,7 +2,6 @@ package fsdriver
 
 import (
 	"os"
-	"strconv"
 
 	"github.com/containerd/continuity/common"
 	"github.com/containerd/continuity/devices"
@@ -10,15 +9,15 @@ import (
 
 // lowDriver is the Linux on Windows lowDriver that allows manipulating
 // files on a remote linux filesystem on Windows like a NFS client.
+// Right now, pretend it's a local file system. Later on, this can be
+// implemented through a NFS client, 9p client or another way.
+
 type lowDriver struct{}
 
 var _ Driver = &lowDriver{}
 var _ XAttrDriver = &lowDriver{}
 var _ LXAttrDriver = &lowDriver{}
 var _ DeviceInfoDriver = &lowDriver{}
-
-// Right now, pretend it's a local file system. Later on, this can be
-// implemented through a NFS client, 9p client or another way.
 
 func (d *lowDriver) Open(p string) (File, error) {
 	file, err := os.Open(p)
@@ -52,16 +51,8 @@ func (d *lowDriver) Link(oldname, newname string) error {
 	return os.Link(oldname, newname)
 }
 
-func (d *lowDriver) Lchown(name, uidStr, gidStr string) error {
-	uid, err := strconv.Atoi(uidStr)
-	if err != nil {
-		return err
-	}
-	gid, err := strconv.Atoi(gidStr)
-	if err != nil {
-		return err
-	}
-	return os.Lchown(name, uid, gid)
+func (d *lowDriver) Lchown(name string, uid, gid int64) error {
+	return os.Lchown(name, int(uid), int(gid))
 }
 
 func (d *lowDriver) Symlink(oldname, newname string) error {
