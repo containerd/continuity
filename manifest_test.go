@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"syscall"
 	"testing"
 
@@ -216,8 +215,8 @@ type dresource struct {
 	target       string // hard/soft link target
 	digest       digest.Digest
 	size         int
-	uid          int
-	gid          int
+	uid          int64
+	gid          int64
 	major, minor int
 }
 
@@ -269,8 +268,8 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 		if err != nil {
 			t.Fatalf("error statting after creation: %v", err)
 		}
-		resources[i].uid = int(st.Sys().(*syscall.Stat_t).Uid)
-		resources[i].gid = int(st.Sys().(*syscall.Stat_t).Gid)
+		resources[i].uid = int64(st.Sys().(*syscall.Stat_t).Uid)
+		resources[i].gid = int64(st.Sys().(*syscall.Stat_t).Gid)
 		resources[i].mode = st.Mode()
 
 		// TODO: Readback and join xattr
@@ -316,16 +315,14 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 		if !filepath.IsAbs(absPath) {
 			absPath = "/" + absPath
 		}
-		uidStr := strconv.Itoa(r.uid)
-		gidStr := strconv.Itoa(r.gid)
 		switch r.kind {
 		case rfile:
 			f := &regularFile{
 				resource: resource{
 					paths: []string{absPath},
 					mode:  r.mode,
-					uid:   uidStr,
-					gid:   gidStr,
+					uid:   r.uid,
+					gid:   r.gid,
 				},
 				size:    int64(r.size),
 				digests: []digest.Digest{r.digest},
@@ -337,8 +334,8 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				resource: resource{
 					paths: []string{absPath},
 					mode:  r.mode,
-					uid:   uidStr,
-					gid:   gidStr,
+					uid:   r.uid,
+					gid:   r.gid,
 				},
 			}
 			resourceMap[absPath] = d
@@ -371,8 +368,8 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				resource: resource{
 					paths: []string{absPath},
 					mode:  r.mode,
-					uid:   uidStr,
-					gid:   gidStr,
+					uid:   r.uid,
+					gid:   r.gid,
 				},
 				target: targetPath,
 			}
@@ -383,8 +380,8 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				resource: resource{
 					paths: []string{absPath},
 					mode:  r.mode,
-					uid:   uidStr,
-					gid:   gidStr,
+					uid:   r.uid,
+					gid:   r.gid,
 				},
 				major: uint64(r.major),
 				minor: uint64(r.minor),
@@ -396,8 +393,8 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				resource: resource{
 					paths: []string{absPath},
 					mode:  r.mode,
-					uid:   uidStr,
-					gid:   gidStr,
+					uid:   r.uid,
+					gid:   r.gid,
 				},
 			}
 			resourceMap[absPath] = p
