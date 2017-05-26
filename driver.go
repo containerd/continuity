@@ -31,16 +31,6 @@ type Driver interface {
 	// interface in the future as more platforms are added.
 	Mknod(path string, mode os.FileMode, major int, minor int) error
 	Mkfifo(path string, mode os.FileMode) error
-
-	// NOTE(stevvooe): We may want to actually include the path manipulation
-	// functions here, as well. They have been listed below to make the
-	// discovery process easier.
-
-	// Join(path ...string) string
-	// IsAbs(string) bool
-	// Abs(string) (string, error)
-	// Rel(base, target string) (string, error)
-	// Walk(string, filepath.WalkFunc) error
 }
 
 func NewSystemDriver() (Driver, error) {
@@ -90,7 +80,8 @@ type DeviceInfoDriver interface {
 // such as xattrs, which can add support at compile time.
 type driver struct{}
 
-var _ Driver = &driver{}
+// LocalDriver is the exported Driver struct for convenience.
+var LocalDriver Driver = &driver{}
 
 func (d *driver) Open(p string) (*os.File, error) {
 	return os.Open(p)

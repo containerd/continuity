@@ -34,19 +34,21 @@ type Context interface {
 type SymlinkPath func(root, linkname, target string) (string, error)
 
 type ContextOptions struct {
-	Digester Digester
-	Driver   Driver
-	Provider ContentProvider
+	Digester   Digester
+	Driver     Driver
+	PathDriver PathDriver
+	Provider   ContentProvider
 }
 
 // context represents a file system context for accessing resources.
 // Generally, all path qualified access and system considerations should land
 // here.
 type context struct {
-	driver   Driver
-	root     string
-	digester Digester
-	provider ContentProvider
+	driver     Driver
+	pathDriver PathDriver
+	root       string
+	digester   Digester
+	provider   ContentProvider
 }
 
 // NewContext returns a Context associated with root. The default driver will
@@ -58,7 +60,11 @@ func NewContext(root string) (Context, error) {
 // NewContextWithOptions returns a Context associate with the root.
 func NewContextWithOptions(root string, options ContextOptions) (Context, error) {
 	// normalize to absolute path
-	root, err := filepath.Abs(filepath.Clean(root))
+	pathDriver := options.PathDriver
+	if pathDriver == nil {
+		pathDriver = LocalPathDriver
+	}
+	root, err := pathDriver.Abs(pathDriver.Clean(root))
 	if err != nil {
 		return nil, err
 	}
@@ -90,10 +96,11 @@ func NewContextWithOptions(root string, options ContextOptions) (Context, error)
 	}
 
 	return &context{
-		root:     root,
-		driver:   driver,
-		digester: digester,
-		provider: options.Provider,
+		root:       root,
+		driver:     driver,
+		pathDriver: pathDriver,
+		digester:   digester,
+		provider:   options.Provider,
 	}, nil
 }
 
@@ -560,7 +567,7 @@ func (c *context) Apply(resource Resource) error {
 // the context. Otherwise identical to filepath.Walk, the path argument is
 // corrected to be contained within the context.
 func (c *context) Walk(fn filepath.WalkFunc) error {
-	return filepath.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
+	return c.pathDriver.Walk(c.root, func(p string, fi os.FileInfo, err error) error {
 		contained, err := c.contain(p)
 		return fn(contained, fi, err)
 	})
@@ -569,7 +576,7 @@ func (c *context) Walk(fn filepath.WalkFunc) error {
 // fullpath returns the system path for the resource, joined with the context
 // root. The path p must be a part of the context.
 func (c *context) fullpath(p string) (string, error) {
-	p = filepath.Join(c.root, p)
+	p = c.pathDriver.Join(c.root, p)
 	if !strings.HasPrefix(p, c.root) {
 		return "", fmt.Errorf("invalid context path")
 	}
@@ -580,19 +587,19 @@ func (c *context) fullpath(p string) (string, error) {
 // contain cleans and santizes the filesystem path p to be an absolute path,
 // effectively relative to the context root.
 func (c *context) contain(p string) (string, error) {
-	sanitized, err := filepath.Rel(c.root, p)
+	sanitized, err := c.pathDriver.Rel(c.root, p)
 	if err != nil {
 		return "", err
 	}
 
 	// ZOMBIES(stevvooe): In certain cases, we may want to remap these to a
 	// "containment error", so the caller can decide what to do.
-	return filepath.Join("/", filepath.Clean(sanitized)), nil
+	return c.pathDriver.Join("/", c.pathDriver.Clean(sanitized)), nil
 }
 
 // digest returns the digest of the file at path p, relative to the root.
 func (c *context) digest(p string) (digest.Digest, error) {
-	f, err := c.driver.Open(filepath.Join(c.root, p))
+	f, err := c.driver.Open(c.pathDriver.Join(c.root, p))
 	if err != nil {
 		return "", err
 	}
