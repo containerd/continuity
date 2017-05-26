@@ -1,4 +1,4 @@
-package continuity
+package pathdriver
 
 import (
 	"path/filepath"

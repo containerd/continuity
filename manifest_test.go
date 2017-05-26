@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/containerd/continuity/devices"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -257,7 +258,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 				t.Fatalf("error creating symlink: %v", err)
 			}
 		case rchardev, rnamedpipe:
-			if err := mknod(p, resource.mode, resource.major, resource.minor); err != nil {
+			if err := devices.Mknod(p, resource.mode, resource.major, resource.minor); err != nil {
 				t.Fatalf("error creating device %q: %v", p, err)
 			}
 		default:

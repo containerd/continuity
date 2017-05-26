@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/containerd/continuity/conterrors"
 	pb "github.com/containerd/continuity/proto"
 	"github.com/golang/protobuf/proto"
 )
@@ -73,7 +74,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 
 		resource, err := ctx.Resource(p, fi)
 		if err != nil {
-			if err == ErrNotFound {
+			if err == conterrors.ErrNotFound {
 				return nil
 			}
 			log.Printf("error getting resource %q: %v", p, err)

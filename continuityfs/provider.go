@@ -4,7 +4,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/containerd/continuity"
+	"github.com/containerd/continuity/driver"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -19,13 +19,13 @@ type FileContentProvider interface {
 
 type fsContentProvider struct {
 	root   string
-	driver continuity.Driver
+	driver driver.Driver
 }
 
 // NewFSFileContentProvider creates a new content provider which
 // gets content from a directory on an existing filesystem based
 // on the resource path.
-func NewFSFileContentProvider(root string, driver continuity.Driver) FileContentProvider {
+func NewFSFileContentProvider(root string, driver driver.Driver) FileContentProvider {
 	return &fsContentProvider{
 		root:   root,
 		driver: driver,
