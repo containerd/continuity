@@ -1,8 +1,25 @@
-package continuity
+package fsdriver
 
 import (
 	"os"
+	"runtime"
+
+	"github.com/containerd/continuity/common"
 )
+
+type DriverType int
+
+const (
+	// Basic is essentially a wrapper around the golang os package.
+	// LOW is the Linux on Windows driver that lets the user manipulate remote
+	// Linux filesystem files on Windows.
+	Basic DriverType = iota
+	LOW
+)
+
+// BasicDriver is exported as a global since it's just a wrapper around
+// the os + filepath functions, so it has no internal state.
+var BasicDriver Driver = &basicDriver{}
 
 // Driver provides all of the system-level functions in a common interface.
 // The context should call these with full paths and should never use the `os`
@@ -15,7 +32,7 @@ import (
 // example, it is not required to wrap os.FileInfo to return correct paths for
 // the call to Name().
 type Driver interface {
-	Open(path string) (*os.File, error)
+	Open(path string) (File, error)
 	Stat(path string) (os.FileInfo, error)
 	Lstat(path string) (os.FileInfo, error)
 	Readlink(p string) (string, error)
@@ -35,19 +52,58 @@ type Driver interface {
 	// NOTE(stevvooe): We may want to actually include the path manipulation
 	// functions here, as well. They have been listed below to make the
 	// discovery process easier.
-
-	// Join(path ...string) string
-	// IsAbs(string) bool
-	// Abs(string) (string, error)
-	// Rel(base, target string) (string, error)
+	Join(pathName ...string) string
+	IsAbs(pathName string) bool
+	Rel(base, target string) (string, error)
+	Base(pathName string) string
+	Dir(pathName string) string
+	Clean(pathName string) string
+	Split(pathName string) (dir, file string)
+	Separator() byte
+	NormalizePath(pathName string) string
+	// Abs(pathName string) (string, error)
 	// Walk(string, filepath.WalkFunc) error
 }
 
-func NewSystemDriver() (Driver, error) {
+// Unfortunately, os.File is a struct instead of an interface, an interface
+// has to be manually defined.
+var _ File = &os.File{}
+
+type File interface {
+	Chdir() error
+	Chmod(mode os.FileMode) error
+	Chown(uid, gid int) error
+	Close() error
+	Fd() uintptr
+	Name() string
+	Read(b []byte) (n int, err error)
+	ReadAt(b []byte, off int64) (n int, err error)
+	Readdir(n int) ([]os.FileInfo, error)
+	Readdirnames(n int) (names []string, err error)
+	Seek(offset int64, whence int) (ret int64, err error)
+	Stat() (os.FileInfo, error)
+	Sync() error
+	Truncate(size int64) error
+	Write(b []byte) (n int, err error)
+	WriteAt(b []byte, off int64) (n int, err error)
+	WriteString(s string) (n int, err error)
+}
+
+func NewSystemDriver(driverType DriverType) (Driver, error) {
 	// TODO(stevvooe): Consider having this take a "hint" path argument, which
 	// would be the context root. The hint could be used to resolve required
 	// filesystem support when assembling the driver to use.
-	return &driver{}, nil
+	switch driverType {
+	case Basic:
+		return BasicDriver, nil
+	case LOW:
+		if runtime.GOOS != "windows" {
+			return nil, common.ErrNotSupported
+		}
+		return &lowDriver{}, nil
+	default:
+		return nil, common.ErrNotSupported
+	}
 }
 
 // XAttrDriver should be implemented on operation systems and filesystems that
@@ -83,54 +139,4 @@ type LXAttrDriver interface {
 
 type DeviceInfoDriver interface {
 	DeviceInfo(fi os.FileInfo) (maj uint64, min uint64, err error)
-}
-
-// driver is a simple default implementation that sends calls out to the "os"
-// package. Extend the "driver" type in system-specific files to add support,
-// such as xattrs, which can add support at compile time.
-type driver struct{}
-
-var _ Driver = &driver{}
-
-func (d *driver) Open(p string) (*os.File, error) {
-	return os.Open(p)
-}
-
-func (d *driver) Stat(p string) (os.FileInfo, error) {
-	return os.Stat(p)
-}
-
-func (d *driver) Lstat(p string) (os.FileInfo, error) {
-	return os.Lstat(p)
-}
-
-func (d *driver) Readlink(p string) (string, error) {
-	return os.Readlink(p)
-}
-
-func (d *driver) Mkdir(p string, mode os.FileMode) error {
-	return os.Mkdir(p, mode)
-}
-
-// Remove is used to unlink files and remove directories.
-// This is following the golang os package api which
-// combines the operations into a higher level Remove
-// function. If explicit unlinking or directory removal
-// to mirror system call is required, they should be
-// split up at that time.
-func (d *driver) Remove(path string) error {
-	return os.Remove(path)
-}
-
-func (d *driver) Link(oldname, newname string) error {
-	return os.Link(oldname, newname)
-}
-
-func (d *driver) Lchown(name string, uid, gid int64) error {
-	// TODO: error out if uid excesses int bit width?
-	return os.Lchown(name, int(uid), int(gid))
-}
-
-func (d *driver) Symlink(oldname, newname string) error {
-	return os.Symlink(oldname, newname)
 }
