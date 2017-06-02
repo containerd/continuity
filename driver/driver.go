@@ -1,8 +1,11 @@
 package driver
 
 import (
+	"fmt"
 	"os"
 )
+
+var ErrNotSupported = fmt.Errorf("not supported")
 
 // Driver provides all of the system-level functions in a common interface.
 // The context should call these with full paths and should never use the `os`

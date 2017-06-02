@@ -7,8 +7,8 @@ import (
 // PathDriver provides all of the path manipulation functions in a common
 // interface. The context should call these and never use the `filepath`
 // package or any other package to manipulate paths. The context should call
-// NormalizePath() before calling other other functions since some OSes accept
-// multiple path separators like Windows.
+// FromSlash to normalize the paths to the OS specific paths before calling
+// the other PathDriver functions.
 type PathDriver interface {
 	Join(paths ...string) string
 	IsAbs(path string) bool
@@ -20,7 +20,7 @@ type PathDriver interface {
 	Separator() byte
 	Abs(path string) (string, error)
 	Walk(string, filepath.WalkFunc) error
-	NormalizePath(path string) string
+	FromSlash(path string) string
 }
 
 // pathDriver is a simple default implementation calls the filepath package.
@@ -72,7 +72,7 @@ func (*pathDriver) Walk(root string, walkFn filepath.WalkFunc) error {
 	return filepath.Walk(root, walkFn)
 }
 
-func (*pathDriver) NormalizePath(path string) string {
+func (*pathDriver) FromSlash(path string) string {
 	// Windows accepts '/' as a path separator, so turn those to '\'
 	// Noops on other platforms.
 	return filepath.FromSlash(path)

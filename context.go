@@ -9,11 +9,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/continuity/conterrors"
 	"github.com/containerd/continuity/devices"
 	driverpkg "github.com/containerd/continuity/driver"
 	"github.com/containerd/continuity/pathdriver"
 	"github.com/opencontainers/go-digest"
+)
+
+var (
+	ErrNotFound     = fmt.Errorf("not found")
+	ErrNotSupported = fmt.Errorf("not supported")
 )
 
 // Context represents a file system context for accessing resources. The
@@ -63,6 +67,8 @@ func NewContextWithOptions(root string, options ContextOptions) (Context, error)
 	if pathDriver == nil {
 		pathDriver = pathdriver.LocalPathDriver
 	}
+
+	root = pathDriver.FromSlash(root)
 	root, err := pathDriver.Abs(pathDriver.Clean(root))
 	if err != nil {
 		return nil, err
@@ -126,7 +132,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	base.xattrs, err = c.resolveXAttrs(fp, fi, base)
-	if err == conterrors.ErrNotSupported {
+	if err == ErrNotSupported {
 		log.Printf("resolving xattrs on %s not supported", fp)
 	} else if err != nil {
 		return nil, err
@@ -167,7 +173,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		deviceDriver, ok := c.driver.(driverpkg.DeviceInfoDriver)
 		if !ok {
 			log.Printf("device extraction not supported %s", fp)
-			return nil, conterrors.ErrNotSupported
+			return nil, ErrNotSupported
 		}
 
 		// character and block devices merely need to recover the
@@ -181,7 +187,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	log.Printf("%q (%v) is not supported", fp, fi.Mode())
-	return nil, conterrors.ErrNotFound
+	return nil, ErrNotFound
 }
 
 func (c *context) verifyMetadata(resource, target Resource) error {
@@ -615,7 +621,7 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 		xattrDriver, ok := c.driver.(driverpkg.XAttrDriver)
 		if !ok {
 			log.Println("xattr extraction not supported")
-			return nil, conterrors.ErrNotSupported
+			return nil, ErrNotSupported
 		}
 
 		return xattrDriver.Getxattr(fp)
@@ -625,7 +631,7 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 		lxattrDriver, ok := c.driver.(driverpkg.LXAttrDriver)
 		if !ok {
 			log.Println("xattr extraction for symlinks not supported")
-			return nil, conterrors.ErrNotSupported
+			return nil, ErrNotSupported
 		}
 
 		return lxattrDriver.LGetxattr(fp)
