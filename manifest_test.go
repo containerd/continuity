@@ -113,7 +113,7 @@ func TestWalkFS(t *testing.T) {
 
 		{
 			kind: rdirectory,
-			path: "/dev",
+			path: "dev",
 			mode: 0755,
 		},
 
@@ -311,15 +311,14 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 	resourceMap := map[string]Resource{}
 	paths := []string{}
 	for _, r := range resources {
-		absPath := r.path
-		if !filepath.IsAbs(absPath) {
-			absPath = "/" + absPath
+		if filepath.IsAbs(r.path) {
+			return nil, fmt.Errorf("path must be relative: %q", r.path)
 		}
 		switch r.kind {
 		case rfile:
 			f := &regularFile{
 				resource: resource{
-					paths: []string{absPath},
+					paths: []string{r.path},
 					mode:  r.mode,
 					uid:   r.uid,
 					gid:   r.gid,
@@ -327,25 +326,24 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				size:    int64(r.size),
 				digests: []digest.Digest{r.digest},
 			}
-			resourceMap[absPath] = f
-			paths = append(paths, absPath)
+			resourceMap[r.path] = f
+			paths = append(paths, r.path)
 		case rdirectory:
 			d := &directory{
 				resource: resource{
-					paths: []string{absPath},
+					paths: []string{r.path},
 					mode:  r.mode,
 					uid:   r.uid,
 					gid:   r.gid,
 				},
 			}
-			resourceMap[absPath] = d
-			paths = append(paths, absPath)
+			resourceMap[r.path] = d
+			paths = append(paths, r.path)
 		case rhardlink:
-			targetPath := r.target
-			if !filepath.IsAbs(targetPath) {
-				targetPath = "/" + targetPath
+			if filepath.IsAbs(r.target) {
+				return nil, fmt.Errorf("target must be relative: %q", r.target)
 			}
-			target, ok := resourceMap[targetPath]
+			target, ok := resourceMap[r.target]
 			if !ok {
 				return nil, errors.New("must specify target before hardlink for test resources")
 			}
@@ -354,7 +352,7 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				return nil, errors.New("hardlink target must be regular file")
 			}
 			// TODO(dmcgowan): full merge
-			rf.paths = append(rf.paths, absPath)
+			rf.paths = append(rf.paths, r.path)
 			// TODO(dmcgowan): check if first path is now different, changes source order and should update
 			// resource map key, to avoid canonically ordered first should be regular file
 			sort.Stable(sort.StringSlice(rf.paths))
@@ -366,19 +364,19 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 			}
 			s := &symLink{
 				resource: resource{
-					paths: []string{absPath},
+					paths: []string{r.path},
 					mode:  r.mode,
 					uid:   r.uid,
 					gid:   r.gid,
 				},
 				target: targetPath,
 			}
-			resourceMap[absPath] = s
-			paths = append(paths, absPath)
+			resourceMap[r.path] = s
+			paths = append(paths, r.path)
 		case rchardev:
 			d := &device{
 				resource: resource{
-					paths: []string{absPath},
+					paths: []string{r.path},
 					mode:  r.mode,
 					uid:   r.uid,
 					gid:   r.gid,
@@ -386,19 +384,19 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 				major: uint64(r.major),
 				minor: uint64(r.minor),
 			}
-			resourceMap[absPath] = d
-			paths = append(paths, absPath)
+			resourceMap[r.path] = d
+			paths = append(paths, r.path)
 		case rnamedpipe:
 			p := &namedPipe{
 				resource: resource{
-					paths: []string{absPath},
+					paths: []string{r.path},
 					mode:  r.mode,
 					uid:   r.uid,
 					gid:   r.gid,
 				},
 			}
-			resourceMap[absPath] = p
-			paths = append(paths, absPath)
+			resourceMap[r.path] = p
+			paths = append(paths, r.path)
 		default:
 			return nil, fmt.Errorf("unknown resource type: %v", r.kind)
 		}

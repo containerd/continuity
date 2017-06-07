@@ -52,7 +52,9 @@ func (m *Manifest) GetResource() []*Resource {
 type Resource struct {
 	// Path specifies the path from the bundle root. If more than one
 	// path is present, the entry may represent a hardlink, rather than using
-	// a link target. The path format is operating system specific.
+	// a link target.
+	// A path must be relative to the bundle root.
+	// TODO(AkihiroSuda): use '/' seperator regardless of the operating system used for building the manifest?
 	Path []string `protobuf:"bytes,1,rep,name=path" json:"path,omitempty"`
 	// Uid specifies the user id for the resource.
 	Uid int64 `protobuf:"varint,2,opt,name=uid" json:"uid,omitempty"`
