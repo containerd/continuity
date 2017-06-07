@@ -7,7 +7,7 @@ import "os"
 var (
 	devNullResource = resource{
 		kind:  chardev,
-		path:  "/dev/null",
+		path:  "dev/null",
 		major: 3,
 		minor: 2,
 		mode:  0666 | os.ModeDevice | os.ModeCharDevice,
@@ -15,7 +15,7 @@ var (
 
 	devZeroResource = resource{
 		kind:  chardev,
-		path:  "/dev/zero",
+		path:  "dev/zero",
 		major: 3,
 		minor: 3,
 		mode:  0666 | os.ModeDevice | os.ModeCharDevice,

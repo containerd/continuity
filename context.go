@@ -587,7 +587,7 @@ func (c *context) contain(p string) (string, error) {
 
 	// ZOMBIES(stevvooe): In certain cases, we may want to remap these to a
 	// "containment error", so the caller can decide what to do.
-	return filepath.Join("/", filepath.Clean(sanitized)), nil
+	return filepath.Clean(sanitized), nil
 }
 
 // digest returns the digest of the file at path p, relative to the root.
