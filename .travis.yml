@@ -8,10 +8,13 @@ go:
 go_import_path: github.com/containerd/continuity
 
 env:
-  - GOOS=windows
-  - GOOS=linux
+# NOTE: we cannot set GOOS directly (because gimme overrides the value)
+  - TRAVIS_GOOS=windows
+  - TRAVIS_GOOS=linux
 
 script:
 # TODO: vendor
+  - export GOOS=${TRAVIS_GOOS}
   - go get -t ./...
-  - make
+  - make build binaries
+  - if [ "$GOOS" = "linux" ]; then make vet test; fi

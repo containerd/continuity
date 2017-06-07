@@ -53,7 +53,9 @@ func init() {
 	MainCmd.AddCommand(LSCmd)
 	MainCmd.AddCommand(StatsCmd)
 	MainCmd.AddCommand(DumpCmd)
-	MainCmd.AddCommand(MountCmd)
+	if MountCmd != nil {
+		MainCmd.AddCommand(MountCmd)
+	}
 	MainCmd.SetUsageTemplate(usageTemplate)
 }
 
