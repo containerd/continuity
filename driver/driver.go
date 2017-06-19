@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -18,7 +19,11 @@ var ErrNotSupported = fmt.Errorf("not supported")
 // example, it is not required to wrap os.FileInfo to return correct paths for
 // the call to Name().
 type Driver interface {
-	Open(path string) (*os.File, error)
+	// Note that Open() returns a File interface instead of *os.File. This
+	// is because os.File is a struct, so if Open was to return *os.File,
+	// the only way to fulfill the interface would be to call os.Open()
+	Open(path string) (File, error)
+
 	Stat(path string) (os.FileInfo, error)
 	Lstat(path string) (os.FileInfo, error)
 	Readlink(p string) (string, error)
@@ -34,6 +39,12 @@ type Driver interface {
 	// interface in the future as more platforms are added.
 	Mknod(path string, mode os.FileMode, major int, minor int) error
 	Mkfifo(path string, mode os.FileMode) error
+}
+
+type File interface {
+	io.ReadWriteCloser
+	io.Seeker
+	Readdir(n int) ([]os.FileInfo, error)
 }
 
 func NewSystemDriver() (Driver, error) {
@@ -83,10 +94,12 @@ type DeviceInfoDriver interface {
 // such as xattrs, which can add support at compile time.
 type driver struct{}
 
+var _ File = &os.File{}
+
 // LocalDriver is the exported Driver struct for convenience.
 var LocalDriver Driver = &driver{}
 
-func (d *driver) Open(p string) (*os.File, error) {
+func (d *driver) Open(p string) (File, error) {
 	return os.Open(p)
 }
 
