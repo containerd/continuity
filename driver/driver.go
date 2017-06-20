@@ -23,6 +23,7 @@ type Driver interface {
 	// is because os.File is a struct, so if Open was to return *os.File,
 	// the only way to fulfill the interface would be to call os.Open()
 	Open(path string) (File, error)
+	OpenFile(path string, flag int, perm os.FileMode) (File, error)
 
 	Stat(path string) (os.FileInfo, error)
 	Lstat(path string) (os.FileInfo, error)
@@ -35,12 +36,18 @@ type Driver interface {
 	Lchown(path string, uid, gid int64) error
 	Symlink(oldname, newname string) error
 
+	MkdirAll(path string, perm os.FileMode) error
+	RemoveAll(path string) error
+
 	// TODO(aaronl): These methods might move outside the main Driver
 	// interface in the future as more platforms are added.
 	Mknod(path string, mode os.FileMode, major int, minor int) error
 	Mkfifo(path string, mode os.FileMode) error
 }
 
+// File is the interface for interacting with files returned by continuity's Open
+// This is needed since os.File is a struct, instead of an interface, so it can't
+// be used.
 type File interface {
 	io.ReadWriteCloser
 	io.Seeker
@@ -103,6 +110,10 @@ func (d *driver) Open(p string) (File, error) {
 	return os.Open(p)
 }
 
+func (d *driver) OpenFile(path string, flag int, perm os.FileMode) (File, error) {
+	return os.OpenFile(path, flag, perm)
+}
+
 func (d *driver) Stat(p string) (os.FileInfo, error) {
 	return os.Stat(p)
 }
@@ -140,4 +151,12 @@ func (d *driver) Lchown(name string, uid, gid int64) error {
 
 func (d *driver) Symlink(oldname, newname string) error {
 	return os.Symlink(oldname, newname)
+}
+
+func (d *driver) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+
+func (d *driver) RemoveAll(path string) error {
+	return os.RemoveAll(path)
 }

@@ -20,6 +20,7 @@ type PathDriver interface {
 	Walk(string, filepath.WalkFunc) error
 	FromSlash(path string) string
 	ToSlash(path string) string
+	Match(pattern, name string) (matched bool, err error)
 }
 
 // pathDriver is a simple default implementation calls the filepath package.
@@ -77,4 +78,8 @@ func (*pathDriver) FromSlash(path string) string {
 
 func (*pathDriver) ToSlash(path string) string {
 	return filepath.ToSlash(path)
+}
+
+func (*pathDriver) Match(pattern, name string) (bool, error) {
+	return filepath.Match(pattern, name)
 }
