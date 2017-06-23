@@ -54,8 +54,9 @@ test:
 
 binaries: ${PREFIX}/bin/continuity
 	@echo "+ $@"
+	@if [ x$$GOOS = xwindows ]; then echo "+ continuity -> continuity.exe"; mv ${PREFIX}/bin/continuity ${PREFIX}/bin/continuity.exe; fi
 
 clean:
 	@echo "+ $@"
-	@rm -rf "${PREFIX}/bin/continuity"
+	@rm -rf "${PREFIX}/bin/continuity" "${PREFIX}/bin/continuity.exe"
 
