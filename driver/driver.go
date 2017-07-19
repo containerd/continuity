@@ -21,6 +21,7 @@ var ErrNotSupported = fmt.Errorf("not supported")
 type Driver interface {
 	// Note that Open() returns a File interface instead of *os.File. This
 	// is because os.File is a struct, so if Open was to return *os.File,
+
 	// the only way to fulfill the interface would be to call os.Open()
 	Open(path string) (File, error)
 	OpenFile(path string, flag int, perm os.FileMode) (File, error)
@@ -43,6 +44,8 @@ type Driver interface {
 	// interface in the future as more platforms are added.
 	Mknod(path string, mode os.FileMode, major int, minor int) error
 	Mkfifo(path string, mode os.FileMode) error
+
+	// TODO(AkihiroSuda): setter for timestamps (Stat already works as getter)
 }
 
 // File is the interface for interacting with files returned by continuity's Open
