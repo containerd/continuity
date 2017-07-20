@@ -11,6 +11,7 @@ env:
 # NOTE: we cannot set GOOS directly (because gimme overrides the value)
   - TRAVIS_GOOS=windows
   - TRAVIS_GOOS=linux
+  - TRAVIS_GOOS=darwin
 
 script:
 # TODO: vendor
