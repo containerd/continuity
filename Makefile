@@ -52,6 +52,10 @@ test:
 	@echo "+ $@"
 	@go test ./...
 
+test-compile:
+	@echo "+ $@"
+	@for pkg in $$(go list ./...); do go test -c $$pkg; done
+
 binaries: ${PREFIX}/bin/continuity
 	@echo "+ $@"
 	@if [ x$$GOOS = xwindows ]; then echo "+ continuity -> continuity.exe"; mv ${PREFIX}/bin/continuity ${PREFIX}/bin/continuity.exe; fi

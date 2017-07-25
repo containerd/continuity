@@ -12,6 +12,7 @@ env:
   - TRAVIS_GOOS=windows
   - TRAVIS_GOOS=linux
   - TRAVIS_GOOS=darwin
+  - TRAVIS_GOOS=solaris
 
 script:
 # TODO: vendor
@@ -19,3 +20,4 @@ script:
   - go get -t ./...
   - make build binaries
   - if [ "$GOOS" = "linux" ]; then make vet test; fi
+  - if [ "$GOOS" != "linux" ]; then make test-compile; fi
