@@ -6,6 +6,8 @@ VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 
 GO_LDFLAGS=-ldflags "-X `go list ./version`.Version=$(VERSION)"
 
+PACKAGES=$(shell go list ./... | grep -v /vendor/)
+
 .PHONY: clean all fmt vet lint build test binaries setup
 .DEFAULT: default
 # skip lint at the moment
@@ -27,13 +29,13 @@ setup:
 	@go get -u github.com/golang/lint/golint
 
 generate:
-	go generate ./...
+	go generate $(PACKAGES)
 
 # Depends on binaries because vet will silently fail if it can't load compiled
 # imports
 vet: binaries
 	@echo "+ $@"
-	@go vet ./...
+	@go vet $(PACKAGES)
 
 fmt:
 	@echo "+ $@"
@@ -42,19 +44,19 @@ fmt:
 
 lint:
 	@echo "+ $@"
-	@test -z "$$(golint ./... | grep -v Godeps/_workspace/src/ | grep -v vendor/ |tee /dev/stderr)"
+	@test -z "$$(golint $(PACKAGES) | grep -v Godeps/_workspace/src/ | grep -v vendor/ |tee /dev/stderr)"
 
 build:
 	@echo "+ $@"
-	@go build -v ${GO_LDFLAGS} ./...
+	@go build -v ${GO_LDFLAGS} $(PACKAGES)
 
 test:
 	@echo "+ $@"
-	@go test ./...
+	@go test $(PACKAGES)
 
 test-compile:
 	@echo "+ $@"
-	@for pkg in $$(go list ./...); do go test -c $$pkg; done
+	@for pkg in $(PACKAGES); do go test -c $$pkg; done
 
 binaries: ${PREFIX}/bin/continuity
 	@echo "+ $@"
