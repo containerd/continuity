@@ -15,9 +15,7 @@ env:
   - TRAVIS_GOOS=solaris
 
 script:
-# TODO: vendor
   - export GOOS=${TRAVIS_GOOS}
-  - go get -t ./...
   - make build binaries
   - if [ "$GOOS" = "linux" ]; then make vet test; fi
   - if [ "$GOOS" != "linux" ]; then make test-compile; fi
