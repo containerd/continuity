@@ -1,8 +1,8 @@
 language: go
 
 go:
-  - 1.7.x
   - 1.8.x
+  - 1.9.x
   - tip
 
 go_import_path: github.com/containerd/continuity
@@ -15,9 +15,7 @@ env:
   - TRAVIS_GOOS=solaris
 
 script:
-# TODO: vendor
   - export GOOS=${TRAVIS_GOOS}
-  - go get -t ./...
   - make build binaries
   - if [ "$GOOS" = "linux" ]; then make vet test; fi
   - if [ "$GOOS" != "linux" ]; then make test-compile; fi
