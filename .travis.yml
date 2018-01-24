@@ -12,7 +12,6 @@ env:
   - TRAVIS_GOOS=windows
   - TRAVIS_GOOS=linux
   - TRAVIS_GOOS=darwin
-  - TRAVIS_GOOS=solaris
 
 script:
   - export GOOS=${TRAVIS_GOOS}
