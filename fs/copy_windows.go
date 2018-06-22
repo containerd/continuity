@@ -7,12 +7,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-func copyFileInfo(fi os.FileInfo, name string) error {
+func copyFileInfoPhase1(fi os.FileInfo, name string) error {
 	if err := os.Chmod(name, fi.Mode()); err != nil {
 		return errors.Wrapf(err, "failed to chmod %s", name)
 	}
 
 	// TODO: copy windows specific metadata
+
+	return nil
+}
+
+func copyFileInfoPhase2(fi os.FileInfo, name string) error {
+	// Does Windows even support file system timestamps?
 
 	return nil
 }

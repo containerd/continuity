@@ -254,7 +254,7 @@ func testDiffWithBase(base, diff fstest.Applier, expected []TestChange) error {
 		return errors.Wrap(err, "failed to apply base filesystem")
 	}
 
-	if err := CopyDir(t2, t1); err != nil {
+	if err := CopyDir(t2, t1, Content, true); err != nil {
 		return errors.Wrap(err, "failed to copy base directory")
 	}
 

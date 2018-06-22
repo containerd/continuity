@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func copyFileInfo(fi os.FileInfo, name string) error {
+func copyFileInfoPhase1(fi os.FileInfo, name string) error {
 	st := fi.Sys().(*syscall.Stat_t)
 	if err := os.Lchown(name, int(st.Uid), int(st.Gid)); err != nil {
 		if os.IsPermission(err) {
@@ -37,6 +37,15 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 		}
 	}
 
+	timespec := []syscall.Timespec{StatAtime(st), StatMtime(st)}
+	if err := syscall.UtimesNano(name, timespec); err != nil {
+		return errors.Wrapf(err, "failed to utime %s", name)
+	}
+
+	return nil
+}
+
+func copyFileInfoPhase2(fi os.FileInfo, name string) error {
 	timespec := []syscall.Timespec{StatAtime(st), StatMtime(st)}
 	if err := syscall.UtimesNano(name, timespec); err != nil {
 		return errors.Wrapf(err, "failed to utime %s", name)

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func copyFileInfo(fi os.FileInfo, name string) error {
+func copyFileInfoPhase1(fi os.FileInfo, name string) error {
 	st := fi.Sys().(*syscall.Stat_t)
 	if err := os.Lchown(name, int(st.Uid), int(st.Gid)); err != nil {
 		if os.IsPermission(err) {
@@ -34,6 +34,12 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 			return errors.Wrapf(err, "failed to chmod %s", name)
 		}
 	}
+
+	return nil
+}
+
+func copyFileInfoPhase2(fi os.FileInfo, name string) error {
+	st := fi.Sys().(*syscall.Stat_t)
 
 	timespec := []unix.Timespec{unix.Timespec(StatAtime(st)), unix.Timespec(StatMtime(st))}
 	if err := unix.UtimesNanoAt(unix.AT_FDCWD, name, timespec, unix.AT_SYMLINK_NOFOLLOW); err != nil {

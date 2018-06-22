@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+type copyCheck func(string, string)
+
 // TODO: Create copy directory which requires privilege
 //  chown
 //  mknod
@@ -27,7 +29,7 @@ func TestCopyDirectory(t *testing.T) {
 		fstest.CreateDir("/home", 0755),
 	)
 
-	if err := testCopy(apply); err != nil {
+	if err := testCopy(apply, Content, true); err != nil {
 		t.Fatalf("Copy test failed: %+v", err)
 	}
 }
@@ -41,7 +43,7 @@ func TestCopyDirectoryWithLocalSymlink(t *testing.T) {
 		fstest.Symlink("nothing.txt", "link-no-nothing.txt"),
 	)
 
-	if err := testCopy(apply); err != nil {
+	if err := testCopy(apply, Content, true); err != nil {
 		t.Fatalf("Copy test failed: %+v", err)
 	}
 }
@@ -56,12 +58,12 @@ func TestCopyWithLargeFile(t *testing.T) {
 		fstest.CreateRandomFile("/banana/split", time.Now().UnixNano(), 3*1024*1024*1024, 0644),
 	)
 
-	if err := testCopy(apply); err != nil {
+	if err := testCopy(apply, Content, true); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func testCopy(apply fstest.Applier) error {
+func testCopy(apply fstest.Applier, copyMode Mode, copyXattrs bool, checks ...copyCheck) error {
 	t1, err := ioutil.TempDir("", "test-copy-src-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary directory")
@@ -78,8 +80,12 @@ func testCopy(apply fstest.Applier) error {
 		return errors.Wrap(err, "failed to apply changes")
 	}
 
-	if err := CopyDir(t2, t1); err != nil {
+	if err := CopyDir(t2, t1, copyMode, copyXattrs); err != nil {
 		return errors.Wrap(err, "failed to copy")
+	}
+
+	for _, check := range checks {
+		check(t1, t2)
 	}
 
 	return fstest.CheckDirectoryEqual(t1, t2)
