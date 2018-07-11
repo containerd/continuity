@@ -11,6 +11,7 @@ import (
 
 	"github.com/containerd/continuity/devices"
 	"github.com/containerd/continuity/sysx"
+	"golang.org/x/sys/unix"
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
@@ -35,7 +36,7 @@ func (d *driver) Lchmod(path string, mode os.FileMode) (err error) {
 		}
 	}
 
-	return sysx.Fchmodat(0, path, uint32(mode), sysx.AtSymlinkNofollow)
+	return unix.Fchmodat(0, path, uint32(mode), unix.AT_SYMLINK_NOFOLLOW)
 }
 
 // Getxattr returns all of the extended attributes for the file at path p.
