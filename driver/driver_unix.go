@@ -10,7 +10,6 @@ import (
 
 	"github.com/containerd/continuity/devices"
 	"github.com/containerd/continuity/sysx"
-	"golang.org/x/sys/unix"
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
@@ -24,11 +23,6 @@ func (d *driver) Mkfifo(path string, mode os.FileMode) error {
 	// mknod with a mode that has ModeNamedPipe set creates a fifo, not a
 	// device.
 	return devices.Mknod(path, mode, 0, 0)
-}
-
-// Lchmod changes the mode of a file not following symlinks.
-func (d *driver) Lchmod(path string, mode os.FileMode) error {
-	return unix.Fchmodat(unix.AT_FDCWD, path, uint32(mode), unix.AT_SYMLINK_NOFOLLOW)
 }
 
 // Getxattr returns all of the extended attributes for the file at path p.
