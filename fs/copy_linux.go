@@ -59,6 +59,8 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 	return nil
 }
 
+const maxSSizeT = int64(^uint(0) >> 1)
+
 func copyFileContent(dst, src *os.File) error {
 	st, err := src.Stat()
 	if err != nil {
@@ -71,7 +73,16 @@ func copyFileContent(dst, src *os.File) error {
 	dstFd := int(dst.Fd())
 
 	for size > 0 {
-		n, err := unix.CopyFileRange(srcFd, nil, dstFd, nil, int(size), 0)
+        // Ensure that we are never trying to copy more than SSIZE_MAX at a
+        // time and at the same time avoids overflows when the file is larger
+        // than 4GB on 32-bit systems.
+		var copySize int
+		if size > maxSSizeT {
+			copySize = int(maxSSizeT)
+		} else {
+			copySize = int(size)
+		}
+		n, err := unix.CopyFileRange(srcFd, nil, dstFd, nil, copySize, 0)
 		if err != nil {
 			if (err != unix.ENOSYS && err != unix.EXDEV) || !first {
 				return errors.Wrap(err, "copy file range failed")
