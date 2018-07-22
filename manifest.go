@@ -1,6 +1,7 @@
 package continuity
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -8,7 +9,19 @@ import (
 	"sort"
 
 	pb "github.com/containerd/continuity/proto"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
+)
+
+const (
+	// MediaTypeManifestV0Protobuf is the media type for manifest formatted as protobuf.
+	// The format is unstable during v0.
+	MediaTypeManifestV0Protobuf = "application/vnd.continuity.manifest.v0+pb"
+	// MediaTypeManifestV0JSON is the media type for manifest formatted as JSON.
+	// JSON is marshalled from protobuf using jsonpb.Marshaler
+	// ({EnumAsInts = false, EmitDefaults = false, OrigName = false})
+	// The format is unstable during v0.
+	MediaTypeManifestV0JSON = "application/vnd.continuity.manifest.v0+json"
 )
 
 // Manifest provides the contents of a manifest. Users of this struct should
@@ -18,13 +31,7 @@ type Manifest struct {
 	Resources []Resource
 }
 
-func Unmarshal(p []byte) (*Manifest, error) {
-	var bm pb.Manifest
-
-	if err := proto.Unmarshal(p, &bm); err != nil {
-		return nil, err
-	}
-
+func manifestFromProto(bm *pb.Manifest) (*Manifest, error) {
 	var m Manifest
 	for _, b := range bm.Resource {
 		r, err := fromProto(b)
@@ -34,26 +41,48 @@ func Unmarshal(p []byte) (*Manifest, error) {
 
 		m.Resources = append(m.Resources, r)
 	}
-
 	return &m, nil
 }
 
-func Marshal(m *Manifest) ([]byte, error) {
+func Unmarshal(p []byte) (*Manifest, error) {
+	var bm pb.Manifest
+	if err := proto.Unmarshal(p, &bm); err != nil {
+		return nil, err
+	}
+	return manifestFromProto(&bm)
+}
+
+func UnmarshalJSON(p []byte) (*Manifest, error) {
+	var bm pb.Manifest
+	if err := jsonpb.Unmarshal(bytes.NewReader(p), &bm); err != nil {
+		return nil, err
+	}
+	return manifestFromProto(&bm)
+}
+
+func manifestToProto(m *Manifest) *pb.Manifest {
 	var bm pb.Manifest
 	for _, resource := range m.Resources {
 		bm.Resource = append(bm.Resource, toProto(resource))
 	}
+	return &bm
+}
 
-	return proto.Marshal(&bm)
+func Marshal(m *Manifest) ([]byte, error) {
+	return proto.Marshal(manifestToProto(m))
 }
 
 func MarshalText(w io.Writer, m *Manifest) error {
-	var bm pb.Manifest
-	for _, resource := range m.Resources {
-		bm.Resource = append(bm.Resource, toProto(resource))
-	}
+	return proto.MarshalText(w, manifestToProto(m))
+}
 
-	return proto.MarshalText(w, &bm)
+func MarshalJSON(m *Manifest) ([]byte, error) {
+	var b bytes.Buffer
+	marshaler := &jsonpb.Marshaler{}
+	if err := marshaler.Marshal(&b, manifestToProto(m)); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 // BuildManifest creates the manifest for the given context
