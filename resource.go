@@ -6,8 +6,11 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"time"
 
 	pb "github.com/containerd/continuity/proto"
+	"github.com/golang/protobuf/ptypes"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -28,6 +31,11 @@ type Resource interface {
 
 	UID() int64
 	GID() int64
+
+	ATime() time.Time
+	MTime() time.Time
+	CTime() time.Time
+	BTime() time.Time
 }
 
 // ByPath provides the canonical sort order for a set of resources. Use with
@@ -108,6 +116,22 @@ func Merge(fs ...Resource) (Resource, error) {
 			return nil, fmt.Errorf("gid does not match: %v != %v", f.GID(), prototype.GID())
 		}
 
+		if f.ATime() != prototype.ATime() {
+			return nil, fmt.Errorf("atime does not match: %v != %v", f.ATime(), prototype.ATime())
+		}
+
+		if f.MTime() != prototype.MTime() {
+			return nil, fmt.Errorf("mtime does not match: %v != %v", f.MTime(), prototype.MTime())
+		}
+
+		if f.CTime() != prototype.CTime() {
+			return nil, fmt.Errorf("ctime does not match: %v != %v", f.CTime(), prototype.CTime())
+		}
+
+		if f.BTime() != prototype.BTime() {
+			return nil, fmt.Errorf("btime does not match: %v != %v", f.BTime(), prototype.BTime())
+		}
+
 		if xattrer, ok := f.(XAttrer); ok {
 			fxattrs := xattrer.XAttrs()
 			if !reflect.DeepEqual(fxattrs, xattrs) {
@@ -170,6 +194,10 @@ func Merge(fs ...Resource) (Resource, error) {
 		mode:   first.Mode(),
 		uid:    first.UID(),
 		gid:    first.GID(),
+		atime:  first.ATime(),
+		mtime:  first.MTime(),
+		ctime:  first.CTime(),
+		btime:  first.BTime(),
 		xattrs: xattrs,
 	}
 
@@ -238,10 +266,11 @@ type Device interface {
 }
 
 type resource struct {
-	paths    []string
-	mode     os.FileMode
-	uid, gid int64
-	xattrs   map[string][]byte
+	paths                      []string
+	mode                       os.FileMode
+	uid, gid                   int64
+	atime, mtime, ctime, btime time.Time
+	xattrs                     map[string][]byte
 }
 
 var _ Resource = &resource{}
@@ -264,6 +293,22 @@ func (r *resource) UID() int64 {
 
 func (r *resource) GID() int64 {
 	return r.gid
+}
+
+func (r *resource) ATime() time.Time {
+	return r.atime
+}
+
+func (r *resource) MTime() time.Time {
+	return r.mtime
+}
+
+func (r *resource) CTime() time.Time {
+	return r.ctime
+}
+
+func (r *resource) BTime() time.Time {
+	return r.btime
 }
 
 type regularFile struct {
@@ -454,15 +499,27 @@ func (d device) Minor() uint64 {
 	return d.minor
 }
 
+func timestampProto(t time.Time) *tspb.Timestamp {
+	x, err := ptypes.TimestampProto(t)
+	if err != nil {
+		panic(err) // FIXME
+	}
+	return x
+}
+
 // toProto converts a resource to a protobuf record. We'd like to push this
 // the individual types but we want to keep this all together during
 // prototyping.
 func toProto(resource Resource) *pb.Resource {
 	b := &pb.Resource{
-		Path: []string{resource.Path()},
-		Mode: uint32(resource.Mode()),
-		Uid:  resource.UID(),
-		Gid:  resource.GID(),
+		Path:  []string{resource.Path()},
+		Mode:  uint32(resource.Mode()),
+		Uid:   resource.UID(),
+		Gid:   resource.GID(),
+		Atime: timestampProto(resource.ATime()),
+		Mtime: timestampProto(resource.MTime()),
+		Ctime: timestampProto(resource.CTime()),
+		Btime: timestampProto(resource.BTime()),
 	}
 
 	if xattrer, ok := resource.(XAttrer); ok {
@@ -503,6 +560,14 @@ func toProto(resource Resource) *pb.Resource {
 	return b
 }
 
+func timestampFromProto(ts *tspb.Timestamp) time.Time {
+	x, err := ptypes.Timestamp(ts)
+	if err != nil {
+		panic(err) // FIXME
+	}
+	return x
+}
+
 // fromProto converts from a protobuf Resource to a Resource interface.
 func fromProto(b *pb.Resource) (Resource, error) {
 	base := &resource{
@@ -510,6 +575,10 @@ func fromProto(b *pb.Resource) (Resource, error) {
 		mode:  os.FileMode(b.Mode),
 		uid:   b.Uid,
 		gid:   b.Gid,
+		atime: timestampFromProto(b.Atime),
+		mtime: timestampFromProto(b.Mtime),
+		ctime: timestampFromProto(b.Ctime),
+		btime: timestampFromProto(b.Btime),
 	}
 
 	base.xattrs = make(map[string][]byte, len(b.Xattr))

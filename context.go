@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/containerd/continuity/devices"
 	driverpkg "github.com/containerd/continuity/driver"
 	"github.com/containerd/continuity/pathdriver"
+	"github.com/djherbis/times"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -138,6 +140,8 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 		return nil, err
 	}
 
+	c.resolveTimestamps(fi, base)
+
 	// TODO(stevvooe): Handle windows alternate data streams.
 
 	if fi.Mode().IsRegular() {
@@ -190,6 +194,26 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	return nil, ErrNotFound
 }
 
+func (c *context) verifyTimestamps(resource, target Resource) error {
+	unixZero := func(t time.Time) bool {
+		// Note: t.IsZero() returns true if t == 0001-01-01 00:00:00, not Unix epoch
+		return t.Unix() == 0 && t.UnixNano() == 0
+	}
+	if !unixZero(resource.ATime()) && !resource.ATime().Equal(target.ATime()) {
+		return fmt.Errorf("resource %q has incorrect atime: %v != %v", target.Path(), target.ATime(), resource.ATime())
+	}
+	if !unixZero(resource.MTime()) && !resource.MTime().Equal(target.MTime()) {
+		return fmt.Errorf("resource %q has incorrect mtime: %v != %v", target.Path(), target.MTime(), resource.MTime())
+	}
+	if !unixZero(resource.CTime()) && !resource.CTime().Equal(target.CTime()) {
+		return fmt.Errorf("resource %q has incorrect ctime: %v != %v", target.Path(), target.CTime(), resource.CTime())
+	}
+	if !unixZero(resource.BTime()) && !resource.BTime().Equal(target.BTime()) {
+		return fmt.Errorf("resource %q has incorrect btime: %v != %v", target.Path(), target.BTime(), resource.BTime())
+	}
+	return nil
+}
+
 func (c *context) verifyMetadata(resource, target Resource) error {
 	if target.Mode() != resource.Mode() {
 		return fmt.Errorf("resource %q has incorrect mode: %v != %v", target.Path(), target.Mode(), resource.Mode())
@@ -201,6 +225,10 @@ func (c *context) verifyMetadata(resource, target Resource) error {
 
 	if target.GID() != resource.GID() {
 		return fmt.Errorf("unexpected gid for %q: %v != %v", target.Path(), target.GID(), target.GID())
+	}
+
+	if err := c.verifyTimestamps(resource, target); err != nil {
+		return err
 	}
 
 	if xattrer, ok := resource.(XAttrer); ok {
@@ -537,6 +565,8 @@ func (c *context) Apply(resource Resource) error {
 		return err
 	}
 
+	// TODO(AkihiroSuda): set timestamps
+
 	if xattrer, ok := resource.(XAttrer); ok {
 		// For xattrs, only ensure that we have those defined in the resource
 		// and their values are set. We can ignore other xattrs. In other words,
@@ -650,4 +680,19 @@ func (c *context) resolveXAttrs(fp string, fi os.FileInfo, base *resource) (map[
 	}
 
 	return nil, nil
+}
+
+// resolveTimestamps set base.[AMCB]Times.
+// When BTime is unsupported, it is set to the Unix epoch.
+func (c *context) resolveTimestamps(fi os.FileInfo, base *resource) {
+	ts := times.Get(fi)
+	base.atime = ts.AccessTime()
+	base.mtime = ts.ModTime()
+	base.ctime = ts.ChangeTime()
+	if ts.HasBirthTime() {
+		base.btime = ts.BirthTime()
+	} else {
+		// Note: time.Time{} stands for 0001-01-01 00:00:00 UTC
+		base.btime = time.Unix(0, 0)
+	}
 }

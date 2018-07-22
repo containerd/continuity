@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package proto;
 
+import "google/protobuf/timestamp.proto";
+
 // Manifest specifies the entries in a container bundle, keyed and sorted by
 // path.
 message Manifest {
@@ -65,6 +67,13 @@ message Resource {
     // Ads stores one or more alternate data streams for the target resource.
     repeated ADSEntry ads = 13;
 
+    // Timestamps.
+    // btime (birthtime) is available on Darwin, FreeBSD, NetBSD, and Windows.
+    // When btime is unknown, it SHOULD be set to zero.
+    google.protobuf.Timestamp atime = 14;
+    google.protobuf.Timestamp mtime = 15;
+    google.protobuf.Timestamp ctime = 16;
+    google.protobuf.Timestamp btime = 17;
 }
 
 // XAttr encodes extended attributes for a resource.
