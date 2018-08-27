@@ -10,5 +10,9 @@ import (
 
 // Lchmod changes the mode of a file not following symlinks.
 func (d *driver) Lchmod(path string, mode os.FileMode) error {
-	return unix.Fchmodat(unix.AT_FDCWD, path, uint32(mode), unix.AT_SYMLINK_NOFOLLOW)
+	err := unix.Fchmodat(unix.AT_FDCWD, path, uint32(mode), unix.AT_SYMLINK_NOFOLLOW)
+	if err != nil {
+		err = &os.PathError{Op: "lchmod", Path: path, Err: err}
+	}
+	return err
 }
