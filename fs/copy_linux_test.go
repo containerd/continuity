@@ -19,6 +19,9 @@
 package fs
 
 import (
+	"io"
+	"path/filepath"
+	"math/rand"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -28,49 +31,67 @@ import (
 	"github.com/containerd/continuity/testutil/loopback"
 )
 
-func testSupportsDType(t *testing.T, expected bool, mkfs ...string) {
+func TestCopyReflinkWithXFS(t *testing.T) {
 	testutil.RequiresRoot(t)
-	mnt, err := ioutil.TempDir("", "containerd-fs-test-supports-dtype")
+	mnt, err := ioutil.TempDir("", "containerd-test-copy-reflink-with-xfs")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(mnt)
 
-	loop, err := loopback.New(100 << 20) // 100 MB
+	loop, err := loopback.New(1 << 30) // sparse file (max=1GB)
 	if err != nil {
 		t.Fatal(err)
 	}
+	mkfs := []string{"mkfs.xfs", "-m", "crc=1", "-n", "ftype=1", "-m", "reflink=1"}
 	if out, err := exec.Command(mkfs[0], append(mkfs[1:], loop.Device)...).CombinedOutput(); err != nil {
 		// not fatal
 		t.Skipf("could not mkfs (%v) %s: %v (out: %q)", mkfs, loop.Device, err, string(out))
 	}
+	loopbackSize, err := loop.HardSize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Loopback file size (after mkfs (%v)): %d", mkfs, loopbackSize)
 	if out, err := exec.Command("mount", loop.Device, mnt).CombinedOutput(); err != nil {
 		// not fatal
 		t.Skipf("could not mount %s: %v (out: %q)", loop.Device, err, string(out))
 	}
+	unmounted := false
 	defer func() {
-		testutil.Unmount(t, mnt)
+		if !unmounted{
+			testutil.Unmount(t, mnt)
+		}
 		loop.Close()
 	}()
-	// check whether it supports d_type
-	result, err := SupportsDType(mnt)
+
+	aPath := filepath.Join(mnt, "a")
+	aSize := int64(100 << 20) // 100MB
+	a, err := os.Create(aPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Supports d_type: %v", result)
-	if expected != result {
-		t.Fatalf("expected %+v, got: %+v", expected, result)
+	randReader := rand.New(rand.NewSource(42))
+	if _, err := io.CopyN(a, randReader, aSize); err != nil {
+		a.Close()
+		t.Fatal(err)
 	}
-}
-
-func TestSupportsDTypeWithFType0XFS(t *testing.T) {
-	testSupportsDType(t, false, "mkfs.xfs", "-m", "crc=0", "-n", "ftype=0")
-}
-
-func TestSupportsDTypeWithFType1XFS(t *testing.T) {
-	testSupportsDType(t, true, "mkfs.xfs", "-m", "crc=0", "-n", "ftype=1")
-}
-
-func TestSupportsDTypeWithExt4(t *testing.T) {
-	testSupportsDType(t, true, "mkfs.ext4", "-F")
+	if err := a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	bPath := filepath.Join(mnt, "b")
+	if err := CopyFile(bPath, aPath); err != nil {
+		t.Fatal(err)
+	}
+	testutil.Unmount(t, mnt)
+	unmounted = true
+	loopbackSize, err = loop.HardSize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Loopback file size (after copying a %d-byte file): %d", aSize, loopbackSize)
+	allowedSize := int64(120 << 20) // 120MB
+	if loopbackSize > allowedSize {
+		t.Fatalf("expected <= %d, got %d", allowedSize, loopbackSize)
+	}
 }
