@@ -19,6 +19,7 @@
 package continuityfs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -31,7 +32,6 @@ import (
 	"github.com/containerd/continuity"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 // File represents any file type (non directory) in the filesystem
