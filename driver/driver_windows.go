@@ -20,15 +20,14 @@ import (
 	"os"
 
 	"github.com/containerd/continuity/sysx"
-	"github.com/pkg/errors"
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
-	return errors.Wrap(ErrNotSupported, "cannot create device node on Windows")
+	return &os.PathError{Op: "mknod", Path: path, Err: ErrNotSupported}
 }
 
 func (d *driver) Mkfifo(path string, mode os.FileMode) error {
-	return errors.Wrap(ErrNotSupported, "cannot create fifo on Windows")
+	return &os.PathError{Op: "mkfifo", Path: path, Err: ErrNotSupported}
 }
 
 // Lchmod changes the mode of an file not following symlinks.

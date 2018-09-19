@@ -31,5 +31,9 @@ func (d *driver) Lchmod(path string, mode os.FileMode) error {
 		return nil
 	}
 
-	return unix.Fchmodat(unix.AT_FDCWD, path, uint32(mode), 0)
+	err := unix.Fchmodat(unix.AT_FDCWD, path, uint32(mode), 0)
+	if err != nil {
+		err = &os.PathError{Op: "lchmod", Path: path, Err: err}
+	}
+	return err
 }

@@ -29,7 +29,11 @@ import (
 )
 
 func (d *driver) Mknod(path string, mode os.FileMode, major, minor int) error {
-	return devices.Mknod(path, mode, major, minor)
+	err := devices.Mknod(path, mode, major, minor)
+	if err != nil {
+		err = &os.PathError{Op: "mknod", Path: path, Err: err}
+	}
+	return err
 }
 
 func (d *driver) Mkfifo(path string, mode os.FileMode) error {
@@ -38,7 +42,11 @@ func (d *driver) Mkfifo(path string, mode os.FileMode) error {
 	}
 	// mknod with a mode that has ModeNamedPipe set creates a fifo, not a
 	// device.
-	return devices.Mknod(path, mode, 0, 0)
+	err := devices.Mknod(path, mode, 0, 0)
+	if err != nil {
+		err = &os.PathError{Op: "mkfifo", Path: path, Err: err}
+	}
+	return err
 }
 
 // Getxattr returns all of the extended attributes for the file at path p.
