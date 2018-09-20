@@ -248,12 +248,6 @@ func walkLink(root, path string, linksWalked *int) (newpath string, islink bool,
 	if err != nil {
 		return "", false, err
 	}
-	if filepath.IsAbs(newpath) && strings.HasPrefix(newpath, root) {
-		newpath = newpath[:len(root)]
-		if !strings.HasPrefix(newpath, "/") {
-			newpath = "/" + newpath
-		}
-	}
 	*linksWalked++
 	return newpath, true, nil
 }
