@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var bufferPool = &sync.Pool{
@@ -32,14 +33,33 @@ var bufferPool = &sync.Pool{
 	},
 }
 
-// CopyDir copies the directory from src to dst.
-// Most efficient copy of files is attempted.
-func CopyDir(dst, src string) error {
-	inodes := map[uint64]string{}
-	return copyDirectory(dst, src, inodes)
+type copyDirOpts struct {
+	allowXAttrErrors bool
 }
 
-func copyDirectory(dst, src string, inodes map[uint64]string) error {
+type CopyDirOpt func(*copyDirOpts) error
+
+func WithAllowXAttrErrors() CopyDirOpt {
+	return func(o *copyDirOpts) error {
+		o.allowXAttrErrors = true
+		return nil
+	}
+}
+
+// CopyDir copies the directory from src to dst.
+// Most efficient copy of files is attempted.
+func CopyDir(dst, src string, opts ...CopyDirOpt) error {
+	var o copyDirOpts
+	for _, opt := range opts {
+		if err := opt(&o); err != nil {
+			return err
+		}
+	}
+	inodes := map[uint64]string{}
+	return copyDirectory(dst, src, inodes, &o)
+}
+
+func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) error {
 	stat, err := os.Stat(src)
 	if err != nil {
 		return errors.Wrapf(err, "failed to stat %s", src)
@@ -75,7 +95,7 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 
 		switch {
 		case fi.IsDir():
-			if err := copyDirectory(target, source, inodes); err != nil {
+			if err := copyDirectory(target, source, inodes, o); err != nil {
 				return err
 			}
 			continue
@@ -112,7 +132,11 @@ func copyDirectory(dst, src string, inodes map[uint64]string) error {
 		}
 
 		if err := copyXAttrs(target, source); err != nil {
-			return errors.Wrap(err, "failed to copy xattrs")
+			if o.allowXAttrErrors {
+				logrus.Warnf("failed to copy xattrs from %s to %s: %v", source, target, err)
+			} else {
+				return errors.Wrap(err, "failed to copy xattrs")
+			}
 		}
 	}
 
