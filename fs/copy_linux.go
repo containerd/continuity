@@ -22,6 +22,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/continuity/sysx"
+	"github.com/sirupsen/logrus"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -101,18 +102,33 @@ func copyFileContent(dst, src *os.File) error {
 	return nil
 }
 
-func copyXAttrs(dst, src string) error {
+func copyXAttrs(dst, src string, allowErrors bool) error {
 	xattrKeys, err := sysx.LListxattr(src)
 	if err != nil {
-		return errors.Wrapf(err, "failed to list xattrs on %s", src)
+		e := errors.Wrapf(err, "failed to list xattrs on %s", src)
+		if allowErrors {
+			logrus.Warnf("%v", e)
+			return nil
+		}
+		return e
 	}
 	for _, xattr := range xattrKeys {
 		data, err := sysx.LGetxattr(src, xattr)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get xattr %q on %s", xattr, src)
+			e := errors.Wrapf(err, "failed to get xattr %q on %s", xattr, src)
+			if allowErrors {
+				logrus.Warnf("%v", e)
+				return nil
+			}
+			return e
 		}
 		if err := sysx.LSetxattr(dst, xattr, data, 0); err != nil {
-			return errors.Wrapf(err, "failed to set xattr %q on %s", xattr, dst)
+			e := errors.Wrapf(err, "failed to set xattr %q on %s", xattr, dst)
+			if allowErrors {
+				logrus.Warnf("%v", e)
+				return nil
+			}
+			return e
 		}
 	}
 

@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 var bufferPool = &sync.Pool{
@@ -131,12 +130,8 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 			return errors.Wrap(err, "failed to copy file info")
 		}
 
-		if err := copyXAttrs(target, source); err != nil {
-			if o.allowXAttrErrors {
-				logrus.Warnf("failed to copy xattrs from %s to %s: %v", source, target, err)
-			} else {
-				return errors.Wrap(err, "failed to copy xattrs")
-			}
+		if err := copyXAttrs(target, source, o.allowXAttrErrors); err != nil {
+			return errors.Wrap(err, "failed to copy xattrs")
 		}
 	}
 
