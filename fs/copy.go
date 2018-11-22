@@ -32,17 +32,33 @@ var bufferPool = &sync.Pool{
 	},
 }
 
+// XAttrErrorHandlers transform a non-nil xattr error.
+// Return nil to ignore an error.
+// xattrKey can be empty for listxattr operation.
+type XAttrErrorHandler func(dst, src, xattrKey string, err error) error
+
 type copyDirOpts struct {
-	allowXAttrErrors bool
+	xeh XAttrErrorHandler
 }
 
 type CopyDirOpt func(*copyDirOpts) error
 
-func WithAllowXAttrErrors() CopyDirOpt {
+// WithXAttrErrorHandler allows specifying XAttrErrorHandler
+// If nil XAttrErrorHandler is specified (default), CopyDir stops
+// on a non-nil xattr error.
+func WithXAttrErrorHandler(xeh XAttrErrorHandler) CopyDirOpt {
 	return func(o *copyDirOpts) error {
-		o.allowXAttrErrors = true
+		o.xeh = xeh
 		return nil
 	}
+}
+
+// WithAllowXAttrErrors allows ignoring xattr errors.
+func WithAllowXAttrErrors() CopyDirOpt {
+	xeh := func(dst, src, xattrKey string, err error) error {
+		return nil
+	}
+	return WithXAttrErrorHandler(xeh)
 }
 
 // CopyDir copies the directory from src to dst.
@@ -130,7 +146,7 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 			return errors.Wrap(err, "failed to copy file info")
 		}
 
-		if err := copyXAttrs(target, source, o.allowXAttrErrors); err != nil {
+		if err := copyXAttrs(target, source, o.xeh); err != nil {
 			return errors.Wrap(err, "failed to copy xattrs")
 		}
 	}
