@@ -18,11 +18,11 @@ PREFIX?=$(shell pwd)
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 
-GO_LDFLAGS=-ldflags "-X `go list ./version`.Version=$(VERSION)"
+GO_LDFLAGS=-ldflags "-X `go list -mod=vendor ./version`.Version=$(VERSION)"
 
-PACKAGES=$(shell go list ./... | grep -v /vendor/)
+PACKAGES=$(shell go list -mod=vendor ./... | grep -v /vendor/)
 
-.PHONY: clean all fmt vet lint build test binaries setup
+.PHONY: clean all fmt vet lint build test binaries
 .DEFAULT: default
 # skip lint at the moment
 all: AUTHORS clean fmt vet fmt build test binaries
@@ -36,20 +36,16 @@ version/version.go:
 
 ${PREFIX}/bin/continuity: version/version.go $(shell find . -type f -name '*.go')
 	@echo "+ $@"
-	@go build  -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./cmd/continuity
-
-setup:
-	@echo "+ $@"
-	@go get -u github.com/golang/lint/golint
+	@go build -mod=vendor -o $@ ${GO_LDFLAGS}  ${GO_GCFLAGS} ./cmd/continuity
 
 generate:
-	go generate $(PACKAGES)
+	go generate -mod=vendor $(PACKAGES)
 
 # Depends on binaries because vet will silently fail if it can't load compiled
 # imports
 vet: binaries
 	@echo "+ $@"
-	@go vet $(PACKAGES)
+	@go vet -mod=vendor $(PACKAGES)
 
 fmt:
 	@echo "+ $@"
@@ -62,15 +58,15 @@ lint:
 
 build:
 	@echo "+ $@"
-	@go build -v ${GO_LDFLAGS} $(PACKAGES)
+	@go build -mod=vendor -v ${GO_LDFLAGS} $(PACKAGES)
 
 test:
 	@echo "+ $@"
-	@go test $(PACKAGES)
+	@go test -mod=vendor $(PACKAGES)
 
 test-compile:
 	@echo "+ $@"
-	@for pkg in $(PACKAGES); do go test -c $$pkg; done
+	@for pkg in $(PACKAGES); do go test -mod=vendor -c $$pkg; done
 
 binaries: ${PREFIX}/bin/continuity
 	@echo "+ $@"
