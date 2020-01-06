@@ -18,9 +18,11 @@
 
 package syscallx
 
-import "syscall"
+import (
+	"golang.org/x/sys/unix"
+)
 
 // Readlink returns the destination of the named symbolic link.
-func Readlink(path string, buf []byte) (n int, err error) {
-	return syscall.Readlink(path, buf)
+func Readlink(path string, buf []byte) (int, error) {
+	return unix.Readlink(path, buf)
 }
