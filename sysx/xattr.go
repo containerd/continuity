@@ -70,32 +70,30 @@ const defaultXattrBufferSize = 128
 type listxattrFunc func(path string, dest []byte) (int, error)
 
 func listxattrAll(path string, listFunc listxattrFunc) ([]string, error) {
-	var p []byte // nil on first execution
-
-	for {
-		n, err := listFunc(path, p) // first call gets buffer size.
+	buf := make([]byte, defaultXattrBufferSize)
+	n, err := listFunc(path, buf)
+	for err == unix.ERANGE {
+		// Buffer too small, use zero-sized buffer to get the actual size
+		n, err = listFunc(path, []byte{})
 		if err != nil {
 			return nil, err
 		}
-
-		if n > len(p) {
-			p = make([]byte, n)
-			continue
-		}
-
-		p = p[:n]
-
-		ps := bytes.Split(bytes.TrimSuffix(p, []byte{0}), []byte{0})
-		var entries []string
-		for _, p := range ps {
-			s := string(p)
-			if s != "" {
-				entries = append(entries, s)
-			}
-		}
-
-		return entries, nil
+		buf = make([]byte, n)
+		n, err = listFunc(path, buf)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	ps := bytes.Split(bytes.TrimSuffix(buf[:n], []byte{0}), []byte{0})
+	var entries []string
+	for _, p := range ps {
+		if len(p) > 0 {
+			entries = append(entries, string(p))
+		}
+	}
+
+	return entries, nil
 }
 
 type getxattrFunc func(string, string, []byte) (int, error)
