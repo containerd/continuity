@@ -14,6 +14,12 @@
    limitations under the License.
 */
 
+// +build go1.13
+
+// Go 1.13 is the minimally supported version for Windows.
+// Earlier golang releases have bug in os.Readlink
+// (see https://github.com/golang/go/issues/30463).
+
 package driver
 
 import (
