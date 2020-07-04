@@ -123,7 +123,7 @@ func sameFile(f1, f2 *currentPath) (bool, error) {
 			} else if f1.f.Size() > 0 {
 				eq, err = compareFileContent(f1.fullPath, f2.fullPath)
 			} else {
-				eq, err = true, nil
+				eq, err = true, nil // if file sizes are zero length, the files are the same by definition
 			}
 			if err != nil || !eq {
 				return eq, err
