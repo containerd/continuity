@@ -52,20 +52,9 @@ ${PREFIX}/bin/continuity: version/version.go $(shell find . -type f -name '*.go'
 generate:
 	go generate -mod=vendor $(PACKAGES)
 
-# Depends on binaries because vet will silently fail if it can't load compiled
-# imports
-vet: binaries
-	@echo "+ $@"
-	@go vet -mod=vendor $(PACKAGES)
-
-fmt:
-	@echo "+ $@"
-	@test -z "$$(gofmt -s -l . | grep -v Godeps/_workspace/src/ | grep -v vendor/ | tee /dev/stderr)" || \
-		echo "+ please format Go code with 'gofmt -s'"
-
 lint:
 	@echo "+ $@"
-	@test -z "$$(golint $(PACKAGES) | grep -v Godeps/_workspace/src/ | grep -v vendor/ |tee /dev/stderr)"
+	@golangci-lint run
 
 build:
 	@echo "+ $@"
