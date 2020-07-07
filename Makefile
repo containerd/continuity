@@ -33,10 +33,10 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     done | sort -u) \
     )
 
-.PHONY: clean all fmt vet lint build test binaries
+.PHONY: clean all lint build test binaries
 .DEFAULT: default
-# skip lint at the moment
-all: AUTHORS clean fmt vet fmt build test binaries
+
+all: AUTHORS clean lint build test binaries
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@

@@ -29,7 +29,7 @@ before_script:
 script:
   - export GOOS=${TRAVIS_GOOS}
   - make build binaries
-  - if [ "$GOOS" = "linux" ]; then make vet test; fi
+  - if [ "$GOOS" = "linux" ]; then make test; fi
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-test; fi
   - if [ "$GOOS" != "linux" ]; then make test-compile; fi
 
