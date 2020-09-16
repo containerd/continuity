@@ -2,7 +2,7 @@
 bazil.org/fuse
 bazil.org/fuse/fs
 bazil.org/fuse/fuseutil
-# github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
+# github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
 # github.com/golang/protobuf v1.2.0
 github.com/golang/protobuf/proto

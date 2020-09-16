@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	bazil.org/fuse v0.0.0-20160811212531-371fbbdaa898
-	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
+	github.com/dustin/go-humanize v1.0.0
 	github.com/golang/protobuf v1.2.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1
