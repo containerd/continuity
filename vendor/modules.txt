@@ -12,7 +12,7 @@ github.com/inconshreveable/mousetrap
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/opencontainers/go-digest v1.0.0-rc1
 github.com/opencontainers/go-digest
-# github.com/pkg/errors v0.8.1-0.20171018195549-f15c970de5b7
+# github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/sirupsen/logrus v1.6.0
 github.com/sirupsen/logrus
