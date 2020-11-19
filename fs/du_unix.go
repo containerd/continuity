@@ -59,10 +59,11 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 			default:
 			}
 
-			inoKey := newInode(fi.Sys().(*syscall.Stat_t))
+			stat := fi.Sys().(*syscall.Stat_t)
+			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}
-				size += fi.Size()
+				size += stat.Blocks * stat.Blksize
 			}
 
 			return nil
@@ -89,10 +90,11 @@ func diffUsage(ctx context.Context, a, b string) (Usage, error) {
 		}
 
 		if kind == ChangeKindAdd || kind == ChangeKindModify {
-			inoKey := newInode(fi.Sys().(*syscall.Stat_t))
+			stat := fi.Sys().(*syscall.Stat_t)
+			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}
-				size += fi.Size()
+				size += stat.Blocks * stat.Blksize
 			}
 
 			return nil
