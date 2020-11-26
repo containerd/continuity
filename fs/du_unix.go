@@ -63,7 +63,8 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}
-				size += stat.Blocks * stat.Blksize
+				// on arm64 stat.Blksize is int32
+				size += stat.Blocks * int64(stat.Blksize) // nolint: unconvert
 			}
 
 			return nil
@@ -94,7 +95,8 @@ func diffUsage(ctx context.Context, a, b string) (Usage, error) {
 			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}
-				size += stat.Blocks * stat.Blksize
+				// on arm64 stat.Blksize is int32
+				size += stat.Blocks * int64(stat.Blksize) // nolint: unconvert
 			}
 
 			return nil
