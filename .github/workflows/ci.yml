@@ -30,7 +30,7 @@ jobs:
     name: CI Tests
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    needs: [checks]
+    needs: [project]
 
     strategy:
       matrix:
