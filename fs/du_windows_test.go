@@ -23,3 +23,7 @@ func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
 			return c * 4096
 		}, nil
 }
+
+func duCheck(string) (int64, error) {
+	return 0, errNotImplemented
+}
