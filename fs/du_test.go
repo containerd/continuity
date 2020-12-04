@@ -31,7 +31,7 @@ import (
 )
 
 func TestUsage(t *testing.T) {
-	align, err := getTmpAlign()
+	align, dirs, err := getTmpAlign()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestUsage(t *testing.T) {
 				fstest.CreateDir("/dir", 0755),
 				fstest.CreateRandomFile("/dir/file", 1, 5, 0644),
 			),
-			size: align(5),
+			size: dirs(2) + align(5),
 		},
 		{
 			name: "MultipleSmallFile",
@@ -57,7 +57,7 @@ func TestUsage(t *testing.T) {
 				fstest.CreateRandomFile("/dir/file1", 2, 5, 0644),
 				fstest.CreateRandomFile("/dir/file2", 3, 5, 0644),
 			),
-			size: align(5) * 2,
+			size: dirs(2) + align(5)*2,
 		},
 		{
 			name: "BiggerFiles",
@@ -67,7 +67,7 @@ func TestUsage(t *testing.T) {
 				fstest.CreateRandomFile("/dir/file2", 5, 1024, 0644),
 				fstest.CreateRandomFile("/dir/file3", 6, 50*1024, 0644),
 			),
-			size: align(5) + align(1024) + align(50*1024),
+			size: dirs(2) + align(5) + align(1024) + align(50*1024),
 		},
 	}
 	if runtime.GOOS != "windows" {
@@ -81,7 +81,7 @@ func TestUsage(t *testing.T) {
 					createSparseFile("/dir/sparse2", 9, 0644, 0, 1024*1024),
 					createSparseFile("/dir/sparse2", 10, 0644, 0, 1024*1024*1024, 1024),
 				),
-				size: align(5)*3 + align(1024),
+				size: dirs(2) + align(5)*3 + align(1024),
 			},
 			{
 				name: "Hardlinks",
@@ -90,7 +90,7 @@ func TestUsage(t *testing.T) {
 					fstest.CreateRandomFile("/dir/file1", 11, 60*1024, 0644),
 					fstest.Link("/dir/file1", "/dir/link1"),
 				),
-				size: align(60 * 1024),
+				size: dirs(2) + align(60*1024),
 			},
 			{
 				name: "HardlinkSparefile",
@@ -99,7 +99,7 @@ func TestUsage(t *testing.T) {
 					createSparseFile("/dir/file1", 10, 0644, 30*1024, 1024*1024*1024, 30*1024),
 					fstest.Link("/dir/file1", "/dir/link1"),
 				),
-				size: align(30*1024) * 2,
+				size: dirs(2) + align(30*1024)*2,
 			},
 		}...)
 	}

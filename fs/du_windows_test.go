@@ -16,8 +16,10 @@
 
 package fs
 
-func getTmpAlign() (func(int64) int64, error) {
+func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
 	return func(s int64) int64 {
-		return s
-	}, nil
+			return s
+		}, func(c int64) int64 {
+			return c * 4096
+		}, nil
 }

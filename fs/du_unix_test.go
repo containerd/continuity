@@ -35,19 +35,22 @@ func getBsize(root string) (int64, error) {
 	return int64(s.Bsize), nil // nolint: unconvert
 }
 
-func getTmpAlign() (func(int64) int64, error) {
+// getTmpAlign returns filesystem specific size alignment functions
+// first:  aligns filesize to file usage based on blocks
+// second: determines directory usage based on directory count (assumes small directories)
+func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
 	t1, err := ioutil.TempDir("", "compute-align-")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create temp dir")
+		return nil, nil, errors.Wrap(err, "failed to create temp dir")
 	}
 	defer os.RemoveAll(t1)
 
 	bsize, err := getBsize(t1)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get bsize")
+		return nil, nil, errors.Wrap(err, "failed to get bsize")
 	}
 
-	return func(size int64) int64 {
+	align := func(size int64) int64 {
 		// Align to blocks
 		aligned := (size / bsize) * bsize
 
@@ -57,5 +60,17 @@ func getTmpAlign() (func(int64) int64, error) {
 		}
 
 		return aligned
-	}, nil
+	}
+
+	fi, err := os.Stat(t1)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to stat directory")
+	}
+
+	dirSize := fi.Sys().(*syscall.Stat_t).Blocks * blocksUnitSize
+	dirs := func(count int64) int64 {
+		return count * dirSize
+	}
+
+	return align, dirs, nil
 }
