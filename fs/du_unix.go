@@ -25,6 +25,14 @@ import (
 	"syscall"
 )
 
+// st_blocks
+//  This field indicates the number of blocks allocated to the
+//  file, in 512-byte units.  (This may be smaller than
+//  st_size/512 when the file has holes.)
+//
+// https://www.man7.org/linux/man-pages/man2/stat.2.html
+const stUnitSize = 512
+
 type inode struct {
 	// TODO(stevvooe): Can probably reduce memory usage by not tracking
 	// device, but we can leave this right for now.
@@ -63,8 +71,8 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}
-				// on arm64 stat.Blksize is int32
-				size += stat.Blocks * int64(stat.Blksize) // nolint: unconvert
+				// blocks are counted in 512-byte units
+				size += stat.Blocks * stUnitSize
 			}
 
 			return nil
