@@ -30,6 +30,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var errNotImplemented = errors.New("check not implemented")
+
 func TestUsage(t *testing.T) {
 	align, dirs, err := getTmpAlign()
 	if err != nil {
@@ -108,29 +110,34 @@ func TestUsage(t *testing.T) {
 		tc := testCases[i]
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			usage, err := fsUsage(tc.fs)
+
+			t1, err := ioutil.TempDir("", "usage-")
+			if err != nil {
+				t.Fatal("Failed to create temp dir:", err)
+			}
+			defer os.RemoveAll(t1)
+
+			if err := tc.fs.Apply(t1); err != nil {
+				t.Fatal("Failed to apply base filesystem:", err)
+			}
+
+			usage, err := DiskUsage(context.Background(), t1)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if usage.Size != tc.size {
 				t.Fatalf("Wrong usage size %d, expected %d", usage.Size, tc.size)
 			}
+
+			du, err := duCheck(t1)
+			if err != nil && err != errNotImplemented {
+				t.Fatal("Failed calling du:", err)
+			}
+			if err == nil && usage.Size != du {
+				t.Fatalf("Wrong usage size %d, du reported %d", usage.Size, du)
+			}
 		})
 	}
-}
-
-func fsUsage(fs fstest.Applier) (Usage, error) {
-	t1, err := ioutil.TempDir("", "usage-")
-	if err != nil {
-		return Usage{}, errors.Wrap(err, "failed to create temp dir")
-	}
-	defer os.RemoveAll(t1)
-
-	if err := fs.Apply(t1); err != nil {
-		return Usage{}, errors.Wrap(err, "failed to apply base filesystem")
-	}
-
-	return DiskUsage(context.Background(), t1)
 }
 
 // createSparseFile creates a sparse file filled with random
