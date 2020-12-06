@@ -19,10 +19,8 @@
 package fs
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
@@ -80,7 +78,7 @@ func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
 }
 
 func duCheck(root string) (usage int64, err error) {
-	cmd := exec.Command("du", "-s", fmt.Sprintf("--block-size=%d", blocksUnitSize), root)
+	cmd := duCmd(root)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
