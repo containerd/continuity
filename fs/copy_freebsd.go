@@ -33,3 +33,10 @@ func copyDevice(dst string, fi os.FileInfo) error {
 	}
 	return unix.Mknod(dst, uint32(fi.Mode()), st.Rdev)
 }
+
+func utimesNano(name string, atime, mtime syscall.Timespec) error {
+	at := unix.NsecToTimespec(atime.Nano())
+	mt := unix.NsecToTimespec(mtime.Nano())
+	utimes := [2]unix.Timespec{at, mt}
+	return unix.UtimesNanoAt(unix.AT_FDCWD, name, utimes[0:], unix.AT_SYMLINK_NOFOLLOW)
+}
