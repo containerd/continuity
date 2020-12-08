@@ -76,6 +76,13 @@ jobs:
       run: make build binaries
       working-directory: src/github.com/containerd/continuity
 
+    - name: Cross-compile
+      if: startsWith(matrix.os, 'ubuntu')
+      shell: bash
+      run: |
+          GOOS=freebsd make build binaries
+      working-directory: src/github.com/containerd/continuity
+
     - name: Linux Tests
       if: startsWith(matrix.os, 'ubuntu')
       run: |
