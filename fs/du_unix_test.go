@@ -34,7 +34,7 @@ func getBsize(root string) (int64, error) {
 		return 0, err
 	}
 
-	return int64(s.Bsize), nil // nolint: unconvert
+	return int64(s.Bsize), nil //nolint: unconvert
 }
 
 // getTmpAlign returns filesystem specific size alignment functions
@@ -92,6 +92,6 @@ func duCheck(root string) (usage int64, err error) {
 	if err != nil {
 		return 0, err
 	}
-	return blocks * blocksUnitSize, nil
 
+	return blocks * blocksUnitSize, nil
 }
