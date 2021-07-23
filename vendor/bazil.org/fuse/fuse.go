@@ -79,7 +79,7 @@
 // is cancelled and no longer needed, the context will be cancelled.
 // Blocking operations should select on a receive from ctx.Done() and attempt to
 // abort the operation early if the receive succeeds (meaning the channel is closed).
-// To indicate that the operation failed because it was aborted, return fuse.EINTR.
+// To indicate that the operation failed because it was aborted, return syscall.EINTR.
 //
 // If an operation does not block for an indefinite amount of time, supporting
 // cancellation is not necessary.
@@ -90,8 +90,8 @@
 // inspect req.Pid, req.Uid, and req.Gid as necessary to implement
 // permission checking. The kernel FUSE layer normally prevents other
 // users from accessing the FUSE file system (to change this, see
-// AllowOther, AllowRoot), but does not enforce access modes (to
-// change this, see DefaultPermissions).
+// AllowOther), but does not enforce access modes (to change this, see
+// DefaultPermissions).
 //
 // Mount Options
 //
@@ -323,6 +323,8 @@ type ErrorNumber interface {
 	Errno() Errno
 }
 
+// Deprecated: Return a syscall.Errno directly. See ToErrno for exact
+// rules.
 const (
 	// ENOSYS indicates that the call is not supported.
 	ENOSYS = Errno(syscall.ENOSYS)
@@ -348,13 +350,14 @@ const (
 const DefaultErrno = EIO
 
 var errnoNames = map[Errno]string{
-	ENOSYS: "ENOSYS",
-	ESTALE: "ESTALE",
-	ENOENT: "ENOENT",
-	EIO:    "EIO",
-	EPERM:  "EPERM",
-	EINTR:  "EINTR",
-	EEXIST: "EEXIST",
+	ENOSYS:                      "ENOSYS",
+	ESTALE:                      "ESTALE",
+	ENOENT:                      "ENOENT",
+	EIO:                         "EIO",
+	EPERM:                       "EPERM",
+	EINTR:                       "EINTR",
+	EEXIST:                      "EEXIST",
+	Errno(syscall.ENAMETOOLONG): "ENAMETOOLONG",
 }
 
 // Errno implements Error and ErrorNumber using a syscall.Errno.
@@ -390,11 +393,28 @@ func (e Errno) MarshalText() ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (h *Header) RespondError(err error) {
-	errno := DefaultErrno
-	if ferr, ok := err.(ErrorNumber); ok {
-		errno = ferr.Errno()
+// ToErrno converts arbitrary errors to Errno.
+//
+// If the underlying type of err is syscall.Errno, it is used
+// directly. No unwrapping is done, to prevent wrong errors from
+// leaking via e.g. *os.PathError.
+//
+// If err unwraps to implement ErrorNumber, that is used.
+//
+// Finally, returns DefaultErrno.
+func ToErrno(err error) Errno {
+	if err, ok := err.(syscall.Errno); ok {
+		return Errno(err)
 	}
+	var errnum ErrorNumber
+	if errors.As(err, &errnum) {
+		return Errno(errnum.Errno())
+	}
+	return DefaultErrno
+}
+
+func (h *Header) RespondError(err error) {
+	errno := ToErrno(err)
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
 	buf := newBuffer(0)
@@ -495,9 +515,15 @@ func fileMode(unixMode uint32) os.FileMode {
 		mode |= os.ModeSymlink
 	case syscall.S_IFSOCK:
 		mode |= os.ModeSocket
+	case 0:
+		// apparently there's plenty of times when the FUSE request
+		// does not contain the file type
+		mode |= os.ModeIrregular
 	default:
-		// no idea
-		mode |= os.ModeDevice
+		// not just unavailable in the kernel codepath; known to
+		// kernel but unrecognized by us
+		Debug(fmt.Sprintf("unrecognized file mode type: %04o", unixMode))
+		mode |= os.ModeIrregular
 	}
 	if unixMode&syscall.S_ISUID != 0 {
 		mode |= os.ModeSetuid
@@ -1004,7 +1030,12 @@ loop:
 		}
 
 	case opBmap:
-		panic("opBmap")
+		// bmap asks to map a byte offset within a file to a single
+		// uint64. On Linux, it triggers only with blkdev fuse mounts,
+		// that claim to be backed by an actual block device. FreeBSD
+		// seems to send it for just any fuse mount, whether there's a
+		// block device involved or not.
+		goto unrecognized
 
 	case opDestroy:
 		req = &DestroyRequest{
@@ -1262,6 +1293,7 @@ func (r *StatfsRequest) Respond(resp *StatfsResponse) {
 		Bfree:   resp.Bfree,
 		Bavail:  resp.Bavail,
 		Files:   resp.Files,
+		Ffree:   resp.Ffree,
 		Bsize:   resp.Bsize,
 		Namelen: resp.Namelen,
 		Frsize:  resp.Frsize,
@@ -1383,8 +1415,6 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	if proto.GE(Protocol{7, 9}) {
 		out.Blksize = a.BlockSize
 	}
-
-	return
 }
 
 // A GetattrRequest asks for the metadata for the file denoted by r.Node.
@@ -1463,7 +1493,7 @@ type GetxattrResponse struct {
 }
 
 func (r *GetxattrResponse) String() string {
-	return fmt.Sprintf("Getxattr %x", r.Xattr)
+	return fmt.Sprintf("Getxattr %q", r.Xattr)
 }
 
 // A ListxattrRequest asks to list the extended attributes associated with r.Node.
@@ -1499,7 +1529,7 @@ type ListxattrResponse struct {
 }
 
 func (r *ListxattrResponse) String() string {
-	return fmt.Sprintf("Listxattr %x", r.Xattr)
+	return fmt.Sprintf("Listxattr %q", r.Xattr)
 }
 
 // Append adds an extended attribute name to the response.
@@ -1564,7 +1594,7 @@ func trunc(b []byte, max int) ([]byte, string) {
 
 func (r *SetxattrRequest) String() string {
 	xattr, tail := trunc(r.Xattr, 16)
-	return fmt.Sprintf("Setxattr [%s] %q %x%s fl=%v @%#x", &r.Header, r.Name, xattr, tail, r.Flags, r.Position)
+	return fmt.Sprintf("Setxattr [%s] %q %q%s fl=%v @%#x", &r.Header, r.Name, xattr, tail, r.Flags, r.Position)
 }
 
 // Respond replies to the request, indicating that the extended attribute was set.
@@ -1985,9 +2015,14 @@ type SetattrRequest struct {
 	Size   uint64
 	Atime  time.Time
 	Mtime  time.Time
-	Mode   os.FileMode
-	Uid    uint32
-	Gid    uint32
+	// Mode is the file mode to set (when valid).
+	//
+	// The type of the node (as in os.ModeType, os.ModeDir etc) is not
+	// guaranteed to be sent by the kernel, in which case
+	// os.ModeIrregular will be set.
+	Mode os.FileMode
+	Uid  uint32
+	Gid  uint32
 
 	// OS X only
 	Bkuptime time.Time
