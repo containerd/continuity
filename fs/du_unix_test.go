@@ -19,13 +19,13 @@
 package fs
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/pkg/errors"
 )
 
 func getBsize(root string) (int64, error) {
@@ -43,13 +43,13 @@ func getBsize(root string) (int64, error) {
 func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
 	t1, err := ioutil.TempDir("", "compute-align-")
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create temp dir")
+		return nil, nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(t1)
 
 	bsize, err := getBsize(t1)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get bsize")
+		return nil, nil, fmt.Errorf("failed to get bsize: %w", err)
 	}
 
 	align := func(size int64) int64 {
@@ -66,7 +66,7 @@ func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
 
 	fi, err := os.Stat(t1)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to stat directory")
+		return nil, nil, fmt.Errorf("failed to stat directory: %w", err)
 	}
 
 	dirSize := fi.Sys().(*syscall.Stat_t).Blocks * blocksUnitSize

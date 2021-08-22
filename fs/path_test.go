@@ -19,13 +19,13 @@
 package fs
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 )
 
 type RootCheck struct {
@@ -287,7 +287,7 @@ func makeRootPathTest(t *testing.T, apply fstest.Applier, checks []RootCheck) fu
 				if err == nil {
 					t.Errorf("(Check %d) Expected error %q, %q evaluated as %q", i+1, check.cause.Error(), check.unresolved, actual)
 				}
-				if errors.Cause(err) != check.cause {
+				if !errors.Is(err, check.cause) {
 					t.Fatalf("(Check %d) Failed to evaluate root path: %+v", i+1, err)
 				}
 			} else {

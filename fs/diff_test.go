@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 )
 
 // TODO: Additional tests
@@ -293,30 +292,30 @@ func TestLchtimes(t *testing.T) {
 func testDiffWithBase(base, diff fstest.Applier, expected []TestChange) error {
 	t1, err := ioutil.TempDir("", "diff-with-base-lower-")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(t1)
 	t2, err := ioutil.TempDir("", "diff-with-base-upper-")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(t2)
 
 	if err := base.Apply(t1); err != nil {
-		return errors.Wrap(err, "failed to apply base filesystem")
+		return fmt.Errorf("failed to apply base filesystem: %w", err)
 	}
 
 	if err := CopyDir(t2, t1); err != nil {
-		return errors.Wrap(err, "failed to copy base directory")
+		return fmt.Errorf("failed to copy base directory: %w", err)
 	}
 
 	if err := diff.Apply(t2); err != nil {
-		return errors.Wrap(err, "failed to apply diff filesystem")
+		return fmt.Errorf("failed to apply diff filesystem: %w", err)
 	}
 
 	changes, err := collectChanges(t1, t2)
 	if err != nil {
-		return errors.Wrap(err, "failed to collect changes")
+		return fmt.Errorf("failed to collect changes: %w", err)
 	}
 
 	return checkChanges(t2, changes, expected)
@@ -346,17 +345,17 @@ func TestBaseDirectoryChanges(t *testing.T) {
 func testDiffWithoutBase(apply fstest.Applier, expected []TestChange) error {
 	tmp, err := ioutil.TempDir("", "diff-without-base-")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temp dir")
+		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmp)
 
 	if err := apply.Apply(tmp); err != nil {
-		return errors.Wrap(err, "failed to apply filesytem changes")
+		return fmt.Errorf("failed to apply filesytem changes: %w", err)
 	}
 
 	changes, err := collectChanges("", tmp)
 	if err != nil {
-		return errors.Wrap(err, "failed to collect changes")
+		return fmt.Errorf("failed to collect changes: %w", err)
 	}
 
 	return checkChanges(tmp, changes, expected)
@@ -364,30 +363,30 @@ func testDiffWithoutBase(apply fstest.Applier, expected []TestChange) error {
 
 func checkChanges(root string, changes, expected []TestChange) error {
 	if len(changes) != len(expected) {
-		return errors.Errorf("Unexpected number of changes:\n%s", diffString(changes, expected))
+		return fmt.Errorf("Unexpected number of changes:\n%s", diffString(changes, expected))
 	}
 	for i := range changes {
 		if changes[i].Path != expected[i].Path || changes[i].Kind != expected[i].Kind {
-			return errors.Errorf("Unexpected change at %d:\n%s", i, diffString(changes, expected))
+			return fmt.Errorf("Unexpected change at %d:\n%s", i, diffString(changes, expected))
 		}
 		if changes[i].Kind != ChangeKindDelete {
 			filename := filepath.Join(root, changes[i].Path)
 			efi, err := os.Stat(filename)
 			if err != nil {
-				return errors.Wrapf(err, "failed to stat %q", filename)
+				return fmt.Errorf("failed to stat %q: %w", filename, err)
 			}
 			afi := changes[i].FileInfo
 			if afi.Size() != efi.Size() {
-				return errors.Errorf("Unexpected change size %d, %q has size %d", afi.Size(), filename, efi.Size())
+				return fmt.Errorf("Unexpected change size %d, %q has size %d", afi.Size(), filename, efi.Size())
 			}
 			if afi.Mode() != efi.Mode() {
-				return errors.Errorf("Unexpected change mode %s, %q has mode %s", afi.Mode(), filename, efi.Mode())
+				return fmt.Errorf("Unexpected change mode %s, %q has mode %s", afi.Mode(), filename, efi.Mode())
 			}
 			if afi.ModTime() != efi.ModTime() {
-				return errors.Errorf("Unexpected change modtime %s, %q has modtime %s", afi.ModTime(), filename, efi.ModTime())
+				return fmt.Errorf("Unexpected change modtime %s, %q has modtime %s", afi.ModTime(), filename, efi.ModTime())
 			}
 			if expected := filepath.Join(root, changes[i].Path); changes[i].Source != expected {
-				return errors.Errorf("Unexpected source path %s, expected %s", changes[i].Source, expected)
+				return fmt.Errorf("Unexpected source path %s, expected %s", changes[i].Source, expected)
 			}
 		}
 	}
@@ -417,7 +416,7 @@ func collectChanges(a, b string) ([]TestChange, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compute changes")
+		return nil, fmt.Errorf("failed to compute changes: %w", err)
 	}
 
 	return changes, nil
