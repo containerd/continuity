@@ -1,3 +1,4 @@
+//go:build darwin || freebsd || openbsd || solaris
 // +build darwin freebsd openbsd solaris
 
 /*
