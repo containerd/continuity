@@ -18,13 +18,13 @@ package fs
 
 import (
 	_ "crypto/sha256"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 )
 
 // TODO: Create copy directory which requires privilege
@@ -80,22 +80,22 @@ func TestCopyWithLargeFile(t *testing.T) {
 func testCopy(apply fstest.Applier) error {
 	t1, err := ioutil.TempDir("", "test-copy-src-")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temporary directory")
+		return fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 	defer os.RemoveAll(t1)
 
 	t2, err := ioutil.TempDir("", "test-copy-dst-")
 	if err != nil {
-		return errors.Wrap(err, "failed to create temporary directory")
+		return fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 	defer os.RemoveAll(t2)
 
 	if err := apply.Apply(t1); err != nil {
-		return errors.Wrap(err, "failed to apply changes")
+		return fmt.Errorf("failed to apply changes: %w", err)
 	}
 
 	if err := CopyDir(t2, t1); err != nil {
-		return errors.Wrap(err, "failed to copy")
+		return fmt.Errorf("failed to copy: %w", err)
 	}
 
 	return fstest.CheckDirectoryEqual(t1, t2)

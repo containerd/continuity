@@ -18,6 +18,7 @@ package fs
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -27,7 +28,6 @@ import (
 	"testing"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/pkg/errors"
 )
 
 var errNotImplemented = errors.New("check not implemented")

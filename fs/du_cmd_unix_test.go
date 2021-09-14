@@ -1,3 +1,4 @@
+//go:build !windows && !freebsd && !darwin
 // +build !windows,!freebsd,!darwin
 
 /*
