@@ -2,6 +2,9 @@
 bazil.org/fuse
 bazil.org/fuse/fs
 bazil.org/fuse/fuseutil
+# github.com/Microsoft/go-winio v0.5.1
+github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/pkg/guid
 # github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
 # github.com/golang/protobuf v1.3.5
