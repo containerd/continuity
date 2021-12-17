@@ -76,13 +76,6 @@ jobs:
       run: make build binaries
       working-directory: src/github.com/containerd/continuity
 
-    - name: Cross-compile
-      if: startsWith(matrix.os, 'ubuntu')
-      shell: bash
-      run: |
-          GOOS=freebsd make build binaries
-      working-directory: src/github.com/containerd/continuity
-
     - name: Linux Tests
       if: startsWith(matrix.os, 'ubuntu')
       run: |
@@ -94,4 +87,37 @@ jobs:
       if: ${{ !startsWith(matrix.os, 'ubuntu') }}
       shell: bash
       run: make test-compile
+      working-directory: src/github.com/containerd/continuity
+
+  cross:
+    name: Cross-compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 10
+    needs: [project]
+
+    strategy:
+      matrix:
+        goos: [freebsd, openbsd, netbsd, darwin, solaris]
+
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.15
+
+    - name: Setup Go binary path
+      shell: bash
+      run: |
+        echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        path: src/github.com/containerd/continuity
+
+    - name: Cross-compile ${{matrix.goos}}
+      shell: bash
+      run: |
+          GOOS=${{matrix.goos}} make build binaries
       working-directory: src/github.com/containerd/continuity

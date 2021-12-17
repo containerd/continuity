@@ -1,5 +1,5 @@
-//go:build openbsd || solaris
-// +build openbsd solaris
+//go:build openbsd || solaris || netbsd
+// +build openbsd solaris netbsd
 
 /*
    Copyright The containerd Authors.
@@ -33,9 +33,4 @@ func copyDevice(dst string, fi os.FileInfo) error {
 		return errors.New("unsupported stat type")
 	}
 	return unix.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
-}
-
-func utimesNano(name string, atime, mtime syscall.Timespec) error {
-	timespec := []syscall.Timespec{atime, mtime}
-	return syscall.UtimesNano(name, timespec)
 }
