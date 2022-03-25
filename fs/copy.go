@@ -158,7 +158,9 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 			}
 		default:
 			// TODO: Support pipes and sockets
-			return fmt.Errorf("unsupported mode %s: %w", fi.Mode(), err)
+			if err != nil {
+				return fmt.Errorf("unsupported mode %s: %w", fi.Mode(), err)
+			}
 		}
 
 		if err := copyFileInfo(fi, source, target); err != nil {
