@@ -1,6 +1,6 @@
 module github.com/containerd/continuity
 
-go 1.13
+go 1.17
 
 require (
 	// 5883e5a4b512fe2e32f915b1c66a1ddfef81cb3f is the last version to support macOS
@@ -14,4 +14,9 @@ require (
 	github.com/spf13/cobra v1.0.0
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
+)
+
+require (
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/spf13/pflag v1.0.3 // indirect
 )
