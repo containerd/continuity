@@ -20,8 +20,6 @@
 package fs
 
 import (
-	"io/ioutil"
-	"os"
 	"os/exec"
 	"testing"
 
@@ -31,11 +29,7 @@ import (
 
 func testSupportsDType(t *testing.T, expected bool, mkfs ...string) {
 	testutil.RequiresRoot(t)
-	mnt, err := ioutil.TempDir("", "containerd-fs-test-supports-dtype")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mnt)
+	mnt := t.TempDir()
 
 	loop, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {

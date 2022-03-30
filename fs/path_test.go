@@ -21,7 +21,6 @@ package fs
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -230,12 +229,7 @@ func TestDirectoryCompare(t *testing.T) {
 }
 
 func testRootPathSymlinkRootScope(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "TestFollowSymlinkRootScope")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
-
+	tmpdir := t.TempDir()
 	expected, err := filepath.EvalSymlinks(tmpdir)
 	if err != nil {
 		t.Fatal(err)
@@ -265,12 +259,7 @@ func testRootPathSymlinkEmpty(t *testing.T) {
 
 func makeRootPathTest(t *testing.T, apply fstest.Applier, checks []RootCheck) func(t *testing.T) {
 	return func(t *testing.T) {
-		applyDir, err := ioutil.TempDir("", "test-root-path-")
-		if err != nil {
-			t.Fatalf("Unable to make temp directory: %+v", err)
-		}
-		defer os.RemoveAll(applyDir)
-
+		applyDir := t.TempDir()
 		if apply != nil {
 			if err := apply.Apply(applyDir); err != nil {
 				t.Fatalf("Apply failed: %+v", err)

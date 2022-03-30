@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -33,7 +32,7 @@ import (
 var errNotImplemented = errors.New("check not implemented")
 
 func TestUsage(t *testing.T) {
-	align, dirs, err := getTmpAlign()
+	align, dirs, err := getTmpAlign(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +110,7 @@ func TestUsage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			t1, err := ioutil.TempDir("", "usage-")
-			if err != nil {
-				t.Fatal("Failed to create temp dir:", err)
-			}
-			defer os.RemoveAll(t1)
-
+			t1 := t.TempDir()
 			if err := tc.fs.Apply(t1); err != nil {
 				t.Fatal("Failed to apply base filesystem:", err)
 			}

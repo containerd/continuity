@@ -22,11 +22,11 @@ package fs
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
+	"testing"
 )
 
 func getBsize(root string) (int64, error) {
@@ -41,12 +41,8 @@ func getBsize(root string) (int64, error) {
 // getTmpAlign returns filesystem specific size alignment functions
 // first:  aligns filesize to file usage based on blocks
 // second: determines directory usage based on directory count (assumes small directories)
-func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
-	t1, err := ioutil.TempDir("", "compute-align-")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(t1)
+func getTmpAlign(t testing.TB) (func(int64) int64, func(int64) int64, error) {
+	t1 := t.TempDir()
 
 	bsize, err := getBsize(t1)
 	if err != nil {

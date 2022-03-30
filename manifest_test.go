@@ -24,7 +24,6 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -142,13 +141,7 @@ func TestWalkFS(t *testing.T) {
 		// devZeroResource,
 	}
 
-	root, err := ioutil.TempDir("", "continuity-test-")
-	if err != nil {
-		t.Fatalf("error creating temporary directory: %v", err)
-	}
-
-	defer os.RemoveAll(root)
-
+	root := t.TempDir()
 	generateTestFiles(t, root, testResources)
 
 	ctx, err := NewContext(root)
@@ -251,7 +244,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 			resources[i].size = size
 
 			// this relies on the proper directory parent being defined.
-			if err := ioutil.WriteFile(p, d, resource.mode); err != nil {
+			if err := os.WriteFile(p, d, resource.mode); err != nil {
 				t.Fatalf("error writing %q: %v", p, err)
 			}
 		case rdirectory:

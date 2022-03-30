@@ -16,7 +16,9 @@
 
 package fs
 
-func getTmpAlign() (func(int64) int64, func(int64) int64, error) {
+import "testing"
+
+func getTmpAlign(t testing.TB) (func(int64) int64, func(int64) int64, error) {
 	return func(s int64) int64 {
 			return s
 		}, func(c int64) int64 {
