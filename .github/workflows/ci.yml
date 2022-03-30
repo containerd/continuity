@@ -76,7 +76,7 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         make test
-        sudo make root-test
+        make root-test
       working-directory: src/github.com/containerd/continuity
 
     - name: Non-Linux Tests
