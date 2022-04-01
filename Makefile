@@ -38,7 +38,7 @@ AUTHORS: .mailmap .git/HEAD
 
 ${PREFIX}/bin/continuity:
 	@echo "+ $@"
-	@go build -mod=vendor -o $@ ${GO_GCFLAGS} ./cmd/continuity
+	@(cd cmd/continuity && go build -mod=mod -o $@  ${GO_GCFLAGS} .)
 
 generate:
 	go generate -mod=vendor $(PACKAGES)
