@@ -17,8 +17,8 @@
 package commands
 
 import (
-	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/containerd/continuity"
 	"github.com/spf13/cobra"
@@ -34,7 +34,7 @@ var VerifyCmd = &cobra.Command{
 
 		root, path := args[0], args[1]
 
-		p, err := ioutil.ReadFile(path)
+		p, err := os.ReadFile(path)
 		if err != nil {
 			log.Fatalf("error reading manifest: %v", err)
 		}

@@ -19,7 +19,6 @@ package fs
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -66,7 +65,7 @@ func TestSimpleDiff(t *testing.T) {
 		Add("/root/.bashrc"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -82,7 +81,7 @@ func TestEmptyFileDiff(t *testing.T) {
 	l2 := fstest.Apply()
 	diff := []TestChange{}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -104,7 +103,7 @@ func TestNestedDeletion(t *testing.T) {
 		Delete("/d1"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -127,7 +126,7 @@ func TestDirectoryReplace(t *testing.T) {
 		Modify("/dir1/f2"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -145,7 +144,7 @@ func TestRemoveDirectoryTree(t *testing.T) {
 		Delete("/dir1"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -165,7 +164,7 @@ func TestRemoveDirectoryTreeWithDash(t *testing.T) {
 		Delete("/dir1"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -185,7 +184,7 @@ func TestFileReplace(t *testing.T) {
 		Add("/dir1/dir2/f1"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -212,7 +211,7 @@ func TestParentDirectoryPermission(t *testing.T) {
 		Add("/dir3/f"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -262,7 +261,7 @@ func TestUpdateWithSameTime(t *testing.T) {
 		Modify("/file-truncated-time-3"),
 	}
 
-	if err := testDiffWithBase(l1, l2, diff); err != nil {
+	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
 	}
 }
@@ -283,23 +282,15 @@ func TestLchtimes(t *testing.T) {
 		)
 		l2 := fstest.Apply() // empty
 		diff := []TestChange{}
-		if err := testDiffWithBase(l1, l2, diff); err != nil {
+		if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 			t.Fatalf("Failed diff with base: %+v", err)
 		}
 	}
 }
 
-func testDiffWithBase(base, diff fstest.Applier, expected []TestChange) error {
-	t1, err := ioutil.TempDir("", "diff-with-base-lower-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(t1)
-	t2, err := ioutil.TempDir("", "diff-with-base-upper-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(t2)
+func testDiffWithBase(t testing.TB, base, diff fstest.Applier, expected []TestChange) error {
+	t1 := t.TempDir()
+	t2 := t.TempDir()
 
 	if err := base.Apply(t1); err != nil {
 		return fmt.Errorf("failed to apply base filesystem: %w", err)
@@ -337,18 +328,13 @@ func TestBaseDirectoryChanges(t *testing.T) {
 		Add("/root/.bashrc"),
 	}
 
-	if err := testDiffWithoutBase(apply, changes); err != nil {
+	if err := testDiffWithoutBase(t, apply, changes); err != nil {
 		t.Fatalf("Failed diff without base: %+v", err)
 	}
 }
 
-func testDiffWithoutBase(apply fstest.Applier, expected []TestChange) error {
-	tmp, err := ioutil.TempDir("", "diff-without-base-")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer os.RemoveAll(tmp)
-
+func testDiffWithoutBase(t testing.TB, apply fstest.Applier, expected []TestChange) error {
+	tmp := t.TempDir()
 	if err := apply.Apply(tmp); err != nil {
 		return fmt.Errorf("failed to apply filesytem changes: %w", err)
 	}

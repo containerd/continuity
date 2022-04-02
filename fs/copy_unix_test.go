@@ -20,7 +20,6 @@
 package fs
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -45,12 +44,7 @@ func assertXAttr(t *testing.T, dir, xattr, xval string, xerr error) {
 }
 
 func TestCopyDirWithXAttrExcludes(t *testing.T) {
-	src, err := ioutil.TempDir("", "test-copy-src-with-xattr-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(src)
-
+	src := t.TempDir()
 	if err := fstest.Apply(
 		fstest.SetXAttr(".", "user.test-1", "one"),
 		fstest.SetXAttr(".", "user.test-2", "two"),
@@ -60,12 +54,8 @@ func TestCopyDirWithXAttrExcludes(t *testing.T) {
 	}
 
 	t.Run("none", func(t *testing.T) {
-		dst, err := ioutil.TempDir("", "test-copy-dst-with-xattr-exclude-none-")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(dst)
-		err = CopyDir(dst, src, WithXAttrExclude())
+		dst := t.TempDir()
+		err := CopyDir(dst, src, WithXAttrExclude())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,12 +65,8 @@ func TestCopyDirWithXAttrExcludes(t *testing.T) {
 	})
 
 	t.Run("some", func(t *testing.T) {
-		dst, err := ioutil.TempDir("", "test-copy-dst-with-xattr-exclude-some-")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(dst)
-		err = CopyDir(dst, src, WithXAttrExclude("user.test-x"))
+		dst := t.TempDir()
+		err := CopyDir(dst, src, WithXAttrExclude("user.test-x"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +85,7 @@ func TestCopyIrregular(t *testing.T) {
 		}
 		prepared++
 		f1Normal := filepath.Join(src, "f1.normal")
-		if err := ioutil.WriteFile(f1Normal, []byte("content of f1.normal"), 0600); err != nil {
+		if err := os.WriteFile(f1Normal, []byte("content of f1.normal"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		prepared++
@@ -117,7 +103,7 @@ func TestCopyIrregular(t *testing.T) {
 	}
 
 	verifyDst := func(dst string) {
-		entries, err := ioutil.ReadDir(dst)
+		entries, err := os.ReadDir(dst)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -136,7 +122,7 @@ func TestCopyIrregular(t *testing.T) {
 					t.Fatalf("unexpected mode of %s: %v", name, mode)
 				}
 			case "f1.normal":
-				b, err := ioutil.ReadFile(full)
+				b, err := os.ReadFile(full)
 				if err != nil {
 					t.Fatal(err)
 				}

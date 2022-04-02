@@ -17,7 +17,7 @@
 package commands
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 
@@ -34,12 +34,12 @@ var DumpCmd = &cobra.Command{
 		var err error
 
 		if len(args) < 1 {
-			p, err = ioutil.ReadAll(os.Stdin)
+			p, err = io.ReadAll(os.Stdin)
 			if err != nil {
 				log.Fatalf("error reading manifest: %v", err)
 			}
 		} else {
-			p, err = ioutil.ReadFile(args[0])
+			p, err = os.ReadFile(args[0])
 			if err != nil {
 				log.Fatalf("error reading manifest: %v", err)
 			}

@@ -22,6 +22,11 @@ jobs:
           path: src/github.com/containerd/continuity
           fetch-depth: 100
 
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.17.x
+
       - uses: containerd/project-checks@v1
         with:
           working-directory: src/github.com/containerd/continuity
@@ -38,15 +43,9 @@ jobs:
 
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v3
       with:
-        go-version: 1.17
-
-    - name: Setup Go binary path
-      shell: bash
-      run: |
-        echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-        echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+        go-version: 1.17.x
 
     - name: Git line endings
       shell: bash
@@ -61,10 +60,7 @@ jobs:
         fetch-depth: 25
 
     - name: Dependencies
-      env:
-        GO111MODULE: on
-      shell: bash
-      run: go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.23.8
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 
     - name: Lint
       shell: bash
@@ -80,7 +76,7 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         make test
-        sudo GOPATH=$GOPATH make root-test
+        make root-test
       working-directory: src/github.com/containerd/continuity
 
     - name: Non-Linux Tests
@@ -101,14 +97,13 @@ jobs:
 
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v3
       with:
         go-version: 1.17
 
     - name: Setup Go binary path
       shell: bash
       run: |
-        echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
         echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
     - name: Check out code

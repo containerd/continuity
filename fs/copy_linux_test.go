@@ -21,7 +21,6 @@ package fs
 
 import (
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -34,11 +33,7 @@ import (
 
 func TestCopyReflinkWithXFS(t *testing.T) {
 	testutil.RequiresRoot(t)
-	mnt, err := ioutil.TempDir("", "containerd-test-copy-reflink-with-xfs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mnt)
+	mnt := t.TempDir()
 
 	loop, err := loopback.New(1 << 30) // sparse file (max=1GB)
 	if err != nil {

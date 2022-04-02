@@ -18,7 +18,6 @@ package commands
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"text/tabwriter"
 
@@ -78,7 +77,7 @@ func init() {
 // readManifestFile reads the manifest from the given path. This should
 // probably be provided by the continuity library.
 func readManifestFile(path string) (*pb.Manifest, error) {
-	p, err := ioutil.ReadFile(path)
+	p, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

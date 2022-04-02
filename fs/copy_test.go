@@ -19,8 +19,6 @@ package fs
 import (
 	_ "crypto/sha256"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
@@ -43,7 +41,7 @@ func TestCopyDirectory(t *testing.T) {
 		fstest.CreateDir("/home", 0755),
 	)
 
-	if err := testCopy(apply); err != nil {
+	if err := testCopy(t, apply); err != nil {
 		t.Fatalf("Copy test failed: %+v", err)
 	}
 }
@@ -57,7 +55,7 @@ func TestCopyDirectoryWithLocalSymlink(t *testing.T) {
 		fstest.Symlink("nothing.txt", "link-no-nothing.txt"),
 	)
 
-	if err := testCopy(apply); err != nil {
+	if err := testCopy(t, apply); err != nil {
 		t.Fatalf("Copy test failed: %+v", err)
 	}
 }
@@ -72,23 +70,14 @@ func TestCopyWithLargeFile(t *testing.T) {
 		fstest.CreateRandomFile("/banana/split", time.Now().UnixNano(), 3*1024*1024*1024, 0644),
 	)
 
-	if err := testCopy(apply); err != nil {
+	if err := testCopy(t, apply); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func testCopy(apply fstest.Applier) error {
-	t1, err := ioutil.TempDir("", "test-copy-src-")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary directory: %w", err)
-	}
-	defer os.RemoveAll(t1)
-
-	t2, err := ioutil.TempDir("", "test-copy-dst-")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary directory: %w", err)
-	}
-	defer os.RemoveAll(t2)
+func testCopy(t testing.TB, apply fstest.Applier) error {
+	t1 := t.TempDir()
+	t2 := t.TempDir()
 
 	if err := apply.Apply(t1); err != nil {
 		return fmt.Errorf("failed to apply changes: %w", err)
