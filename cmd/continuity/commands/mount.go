@@ -31,7 +31,7 @@ import (
 	"bazil.org/fuse/fs"
 
 	"github.com/containerd/continuity"
-	"github.com/containerd/continuity/continuityfs"
+	"github.com/containerd/continuity/cmd/continuity/continuityfs"
 	"github.com/containerd/continuity/driver"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

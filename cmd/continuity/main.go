@@ -19,7 +19,7 @@ package main
 import (
 	_ "crypto/sha256"
 
-	"github.com/containerd/continuity/commands"
+	"github.com/containerd/continuity/cmd/continuity/commands"
 )
 
 func main() {
