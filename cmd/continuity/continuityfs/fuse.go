@@ -1,5 +1,5 @@
-//go:build linux || darwin || freebsd
-// +build linux darwin freebsd
+//go:build linux || freebsd
+// +build linux freebsd
 
 /*
    Copyright The containerd Authors.

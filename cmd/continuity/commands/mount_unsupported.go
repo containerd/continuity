@@ -1,5 +1,5 @@
-//go:build windows || solaris || openbsd || netbsd
-// +build windows solaris openbsd netbsd
+//go:build windows || solaris || openbsd || netbsd || darwin
+// +build windows solaris openbsd netbsd darwin
 
 /*
    Copyright The containerd Authors.
