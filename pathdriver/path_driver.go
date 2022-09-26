@@ -17,7 +17,12 @@
 package pathdriver
 
 import (
+	"errors"
 	"path/filepath"
+)
+
+var (
+	ErrPathRecursion = errors.New("path recursion")
 )
 
 // PathDriver provides all of the path manipulation functions in a common
@@ -79,13 +84,6 @@ func (*pathDriver) Separator() byte {
 
 func (*pathDriver) Abs(path string) (string, error) {
 	return filepath.Abs(path)
-}
-
-// Note that filepath.Walk calls os.Stat, so if the context wants to
-// to call Driver.Stat() for Walk, they need to create a new struct that
-// overrides this method.
-func (*pathDriver) Walk(root string, walkFn filepath.WalkFunc) error {
-	return filepath.Walk(root, walkFn)
 }
 
 func (*pathDriver) FromSlash(path string) string {
