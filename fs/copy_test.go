@@ -32,13 +32,13 @@ import (
 
 func TestCopyDirectory(t *testing.T) {
 	apply := fstest.Apply(
-		fstest.CreateDir("/etc/", 0755),
-		fstest.CreateFile("/etc/hosts", []byte("localhost 127.0.0.1"), 0644),
+		fstest.CreateDir("/etc/", 0o755),
+		fstest.CreateFile("/etc/hosts", []byte("localhost 127.0.0.1"), 0o644),
 		fstest.Link("/etc/hosts", "/etc/hosts.allow"),
-		fstest.CreateDir("/usr/local/lib", 0755),
-		fstest.CreateFile("/usr/local/lib/libnothing.so", []byte{0x00, 0x00}, 0755),
+		fstest.CreateDir("/usr/local/lib", 0o755),
+		fstest.CreateFile("/usr/local/lib/libnothing.so", []byte{0x00, 0x00}, 0o755),
 		fstest.Symlink("libnothing.so", "/usr/local/lib/libnothing.so.2"),
-		fstest.CreateDir("/home", 0755),
+		fstest.CreateDir("/home", 0o755),
 	)
 
 	if err := testCopy(t, apply); err != nil {
@@ -51,7 +51,7 @@ func TestCopyDirectory(t *testing.T) {
 // fail.
 func TestCopyDirectoryWithLocalSymlink(t *testing.T) {
 	apply := fstest.Apply(
-		fstest.CreateFile("nothing.txt", []byte{0x00, 0x00}, 0755),
+		fstest.CreateFile("nothing.txt", []byte{0x00, 0x00}, 0o755),
 		fstest.Symlink("nothing.txt", "link-no-nothing.txt"),
 	)
 
@@ -66,8 +66,8 @@ func TestCopyWithLargeFile(t *testing.T) {
 		t.SkipNow()
 	}
 	apply := fstest.Apply(
-		fstest.CreateDir("/banana", 0755),
-		fstest.CreateRandomFile("/banana/split", time.Now().UnixNano(), 3*1024*1024*1024, 0644),
+		fstest.CreateDir("/banana", 0o755),
+		fstest.CreateRandomFile("/banana/split", time.Now().UnixNano(), 3*1024*1024*1024, 0o644),
 	)
 
 	if err := testCopy(t, apply); err != nil {

@@ -99,7 +99,6 @@ func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 	return &fileHandler{
 		reader: r,
 	}, nil
-
 }
 
 func (f *File) getDirent(name string) (fuse.Dirent, error) {
@@ -171,7 +170,7 @@ type Dir struct {
 // Attr sets the fuse attributes for the directory
 func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
 	if d.resource == nil {
-		attr.Mode = os.ModeDir | 0555
+		attr.Mode = os.ModeDir | 0o555
 	} else {
 		attr.Mode = d.resource.Mode()
 	}
@@ -239,9 +238,7 @@ func NewDir(inode uint64, provider FileContentProvider) *Dir {
 	}
 }
 
-var (
-	rootPath = fmt.Sprintf("%c", filepath.Separator)
-)
+var rootPath = fmt.Sprintf("%c", filepath.Separator)
 
 func addNode(path string, node fs.Node, cache map[string]*Dir, provider FileContentProvider) {
 	dirPath, file := filepath.Split(path)
@@ -310,7 +307,6 @@ func NewFSFromManifest(manifest *continuity.Manifest, mountRoot string, provider
 			return nil, err
 		}
 		if rf, ok := resource.(continuity.RegularFile); ok {
-
 			for _, p := range rf.Paths() {
 				addNode(p, f, dirCache, provider)
 			}

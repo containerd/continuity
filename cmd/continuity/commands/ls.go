@@ -50,7 +50,6 @@ var LSCmd = &cobra.Command{
 					//nolint:unconvert
 					fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path)
 				}
-
 			}
 		}
 

@@ -27,7 +27,7 @@ func TestAtomicWriteFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	expected := []byte("barbaz")
-	if err := AtomicWriteFile(filepath.Join(tmpDir, "foo"), expected, 0666); err != nil {
+	if err := AtomicWriteFile(filepath.Join(tmpDir, "foo"), expected, 0o666); err != nil {
 		t.Fatalf("Error writing to file: %v", err)
 	}
 
@@ -44,7 +44,7 @@ func TestAtomicWriteFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error statting file: %v", err)
 	}
-	if expected := os.FileMode(0666); st.Mode() != expected {
+	if expected := os.FileMode(0o666); st.Mode() != expected {
 		t.Fatalf("Mode mismatched, expected %o, got %o", expected, st.Mode())
 	}
 }

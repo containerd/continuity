@@ -411,7 +411,7 @@ func (c *context) Apply(resource Resource) error {
 		return fmt.Errorf("resource %v escapes root", resource)
 	}
 
-	var chmod = true
+	chmod := true
 	fi, err := c.driver.Lstat(fp)
 	if err != nil {
 		if !os.IsNotExist(err) {

@@ -61,7 +61,7 @@ func TestWalkFS(t *testing.T) {
 	testResources := []dresource{
 		{
 			path: "a",
-			mode: 0644,
+			mode: 0o644,
 		},
 		{
 			kind:   rhardlink,
@@ -71,7 +71,7 @@ func TestWalkFS(t *testing.T) {
 		{
 			kind: rdirectory,
 			path: "b",
-			mode: 0755,
+			mode: 0o755,
 		},
 		{
 			kind:   rhardlink,
@@ -80,33 +80,33 @@ func TestWalkFS(t *testing.T) {
 		},
 		{
 			path: "b/a",
-			mode: 0600 | os.ModeSticky,
+			mode: 0o600 | os.ModeSticky,
 		},
 		{
 			kind: rdirectory,
 			path: "c",
-			mode: 0755,
+			mode: 0o755,
 		},
 		{
 			path: "c/a",
-			mode: 0644,
+			mode: 0o644,
 		},
 		{
 			kind:   rrelsymlink,
 			path:   "c/ca-relsymlink",
-			mode:   0600,
+			mode:   0o600,
 			target: "a",
 		},
 		{
 			kind:   rrelsymlink,
 			path:   "c/a-relsymlink",
-			mode:   0600,
+			mode:   0o600,
 			target: "../a",
 		},
 		{
 			kind:   rabssymlink,
 			path:   "c/a-abssymlink",
-			mode:   0600,
+			mode:   0o600,
 			target: "a",
 		},
 		// TODO(stevvooe): Make sure we can test this case and get proper
@@ -125,13 +125,13 @@ func TestWalkFS(t *testing.T) {
 		{
 			kind: rnamedpipe,
 			path: "fifo",
-			mode: 0666 | os.ModeNamedPipe,
+			mode: 0o666 | os.ModeNamedPipe,
 		},
 
 		{
 			kind: rdirectory,
 			path: "/dev",
-			mode: 0755,
+			mode: 0o755,
 		},
 
 		// NOTE(stevvooe): Below here, we add a few simple character devices.

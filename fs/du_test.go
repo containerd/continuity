@@ -46,27 +46,27 @@ func TestUsage(t *testing.T) {
 		{
 			name: "SingleSmallFile",
 			fs: fstest.Apply(
-				fstest.CreateDir("/dir", 0755),
-				fstest.CreateRandomFile("/dir/file", 1, 5, 0644),
+				fstest.CreateDir("/dir", 0o755),
+				fstest.CreateRandomFile("/dir/file", 1, 5, 0o644),
 			),
 			size: dirs(2) + align(5),
 		},
 		{
 			name: "MultipleSmallFile",
 			fs: fstest.Apply(
-				fstest.CreateDir("/dir", 0755),
-				fstest.CreateRandomFile("/dir/file1", 2, 5, 0644),
-				fstest.CreateRandomFile("/dir/file2", 3, 5, 0644),
+				fstest.CreateDir("/dir", 0o755),
+				fstest.CreateRandomFile("/dir/file1", 2, 5, 0o644),
+				fstest.CreateRandomFile("/dir/file2", 3, 5, 0o644),
 			),
 			size: dirs(2) + align(5)*2,
 		},
 		{
 			name: "BiggerFiles",
 			fs: fstest.Apply(
-				fstest.CreateDir("/dir", 0755),
-				fstest.CreateRandomFile("/dir/file1", 4, 5, 0644),
-				fstest.CreateRandomFile("/dir/file2", 5, 1024, 0644),
-				fstest.CreateRandomFile("/dir/file3", 6, 50*1024, 0644),
+				fstest.CreateDir("/dir", 0o755),
+				fstest.CreateRandomFile("/dir/file1", 4, 5, 0o644),
+				fstest.CreateRandomFile("/dir/file2", 5, 1024, 0o644),
+				fstest.CreateRandomFile("/dir/file3", 6, 50*1024, 0o644),
 			),
 			size: dirs(2) + align(5) + align(1024) + align(50*1024),
 		},
@@ -76,19 +76,19 @@ func TestUsage(t *testing.T) {
 			{
 				name: "SparseFiles",
 				fs: fstest.Apply(
-					fstest.CreateDir("/dir", 0755),
-					fstest.CreateRandomFile("/dir/file1", 7, 5, 0644),
-					createSparseFile("/dir/sparse1", 8, 0644, 5, 1024*1024, 5),
-					createSparseFile("/dir/sparse2", 9, 0644, 0, 1024*1024),
-					createSparseFile("/dir/sparse2", 10, 0644, 0, 1024*1024*1024, 1024),
+					fstest.CreateDir("/dir", 0o755),
+					fstest.CreateRandomFile("/dir/file1", 7, 5, 0o644),
+					createSparseFile("/dir/sparse1", 8, 0o644, 5, 1024*1024, 5),
+					createSparseFile("/dir/sparse2", 9, 0o644, 0, 1024*1024),
+					createSparseFile("/dir/sparse2", 10, 0o644, 0, 1024*1024*1024, 1024),
 				),
 				size: dirs(2) + align(5)*3 + align(1024),
 			},
 			{
 				name: "Hardlinks",
 				fs: fstest.Apply(
-					fstest.CreateDir("/dir", 0755),
-					fstest.CreateRandomFile("/dir/file1", 11, 60*1024, 0644),
+					fstest.CreateDir("/dir", 0o755),
+					fstest.CreateRandomFile("/dir/file1", 11, 60*1024, 0o644),
 					fstest.Link("/dir/file1", "/dir/link1"),
 				),
 				size: dirs(2) + align(60*1024),
@@ -96,8 +96,8 @@ func TestUsage(t *testing.T) {
 			{
 				name: "HardlinkSparefile",
 				fs: fstest.Apply(
-					fstest.CreateDir("/dir", 0755),
-					createSparseFile("/dir/file1", 10, 0644, 30*1024, 1024*1024*1024, 30*1024),
+					fstest.CreateDir("/dir", 0o755),
+					createSparseFile("/dir/file1", 10, 0o644, 30*1024, 1024*1024*1024, 30*1024),
 					fstest.Link("/dir/file1", "/dir/link1"),
 				),
 				size: dirs(2) + align(30*1024)*2,
