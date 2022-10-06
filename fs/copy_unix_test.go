@@ -80,22 +80,22 @@ func TestCopyIrregular(t *testing.T) {
 	var prepared int
 	prepareSrc := func(src string) {
 		f0Pipe := filepath.Join(src, "f0.pipe")
-		if err := unix.Mkfifo(f0Pipe, 0600); err != nil {
+		if err := unix.Mkfifo(f0Pipe, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		prepared++
 		f1Normal := filepath.Join(src, "f1.normal")
-		if err := os.WriteFile(f1Normal, []byte("content of f1.normal"), 0600); err != nil {
+		if err := os.WriteFile(f1Normal, []byte("content of f1.normal"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		prepared++
 		f2Socket := filepath.Join(src, "f2.sock")
-		if err := unix.Mknod(f2Socket, 0600|unix.S_IFSOCK, 0); err != nil {
+		if err := unix.Mknod(f2Socket, 0o600|unix.S_IFSOCK, 0); err != nil {
 			t.Fatal(err)
 		}
 		prepared++
 		f3Dev := filepath.Join(src, "f3.dev")
-		if err := unix.Mknod(f3Dev, 0600|unix.S_IFCHR, 42); err != nil {
+		if err := unix.Mknod(f3Dev, 0o600|unix.S_IFCHR, 42); err != nil {
 			t.Logf("skipping testing S_IFCHR: %v", err)
 		} else {
 			prepared++

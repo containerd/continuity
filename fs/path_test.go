@@ -131,7 +131,7 @@ func TestRootPath(t *testing.T) {
 				Symlink("foo", "bar"),
 				Symlink("bar", "foo"),
 			),
-			checks: ErrorWithScope("foo", "", errTooManyLinks), //TODO: Test for circular error
+			checks: ErrorWithScope("foo", "", errTooManyLinks), // TODO: Test for circular error
 		},
 		{
 			name: "SymlinkCircularUnderRoot",
@@ -145,7 +145,7 @@ func TestRootPath(t *testing.T) {
 		{
 			name: "SymlinkComplexChain",
 			apply: fstest.Apply(
-				fstest.CreateDir("root2", 0777),
+				fstest.CreateDir("root2", 0o777),
 				Symlink("root2", "root"),
 				Symlink("r/s", "root/a"),
 				Symlink("../root/t", "root/r"),
@@ -338,7 +338,7 @@ func Symlink(oldname, newname string) fstest.Applier {
 	dir := filepath.Dir(newname)
 	if dir != "" {
 		return fstest.Apply(
-			fstest.CreateDir(dir, 0755),
+			fstest.CreateDir(dir, 0o755),
 			fstest.Symlink(oldname, newname),
 		)
 	}

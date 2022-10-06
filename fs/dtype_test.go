@@ -23,7 +23,6 @@ import (
 )
 
 func TestRequiresRootNOP(t *testing.T) {
-
 	// This is a dummy test case that exist to call
 	// testutil.RequiresRoot() on non-linux platforms.  This is
 	// needed because the Makfile root-coverage tests target
