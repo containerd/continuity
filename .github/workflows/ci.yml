@@ -13,11 +13,11 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/continuity
           fetch-depth: 100
@@ -25,7 +25,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.17.x
+          go-version: 1.18.x
 
       - uses: containerd/project-checks@v1
         with:
@@ -39,13 +39,13 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15, windows-2019]
+        os: [ubuntu-22.04, macos-10.15, windows-2019]
 
     steps:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.x
+        go-version: 1.18.x
 
     - name: Git line endings
       shell: bash
@@ -54,13 +54,13 @@ jobs:
         git config --global core.eol lf
 
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: src/github.com/containerd/continuity
         fetch-depth: 25
 
     - name: Dependencies
-      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
 
     - name: Lint
       shell: bash
@@ -87,7 +87,7 @@ jobs:
 
   cross:
     name: Cross-compile
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     needs: [project]
 
@@ -99,7 +99,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17
+        go-version: 1.18
 
     - name: Setup Go binary path
       shell: bash
@@ -107,7 +107,7 @@ jobs:
         echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: src/github.com/containerd/continuity
 
