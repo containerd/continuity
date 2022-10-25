@@ -20,7 +20,6 @@ package continuity
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -31,20 +30,24 @@ func tree(w io.Writer, dir string) error {
 }
 
 func _tree(w io.Writer, dir string, indent string) error {
-	files, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
-	for i, f := range files {
-		fPath := filepath.Join(dir, f.Name())
+	for i, entry := range entries {
+		fPath := filepath.Join(dir, entry.Name())
 		fIndent := indent
-		if i < len(files)-1 {
+		if i < len(entries)-1 {
 			fIndent += "|-- "
 		} else {
 			fIndent += "`-- "
 		}
 		target := ""
-		if f.Mode()&os.ModeSymlink == os.ModeSymlink {
+		fileInfo, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("file info not found for %s: %w", entry.Name(), err)
+		}
+		if (fileInfo.Mode() & os.ModeSymlink) == os.ModeSymlink {
 			realPath, err := os.Readlink(fPath)
 			if err != nil {
 				target += fmt.Sprintf(" -> unknown (error: %v)", err)
@@ -52,11 +55,10 @@ func _tree(w io.Writer, dir string, indent string) error {
 				target += " -> " + realPath
 			}
 		}
-		fmt.Fprintf(w, "%s%s%s\n",
-			fIndent, f.Name(), target)
-		if f.IsDir() {
+		fmt.Fprintf(w, "%s%s%s\n", fIndent, entry.Name(), target)
+		if entry.IsDir() {
 			dIndent := indent
-			if i < len(files)-1 {
+			if i < len(entries)-1 {
 				dIndent += "|   "
 			} else {
 				dIndent += "    "
