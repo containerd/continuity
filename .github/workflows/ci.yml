@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  GO_VERSION: 1.20.x
+
 jobs:
 
   #
@@ -25,9 +28,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18.x
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: containerd/project-checks@v1
+      - uses: containerd/project-checks@v1.1.0
         with:
           working-directory: src/github.com/containerd/continuity
 
@@ -45,7 +48,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18.x
+        go-version: ${{ env.GO_VERSION }}
 
     - name: Git line endings
       shell: bash
@@ -60,7 +63,7 @@ jobs:
         fetch-depth: 25
 
     - name: Dependencies
-      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
 
     - name: Lint
       shell: bash
@@ -99,7 +102,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: ${{ env.GO_VERSION }}
 
     - name: Setup Go binary path
       shell: bash
