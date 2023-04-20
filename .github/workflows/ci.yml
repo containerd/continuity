@@ -75,19 +75,16 @@ jobs:
       run: make build binaries
       working-directory: src/github.com/containerd/continuity
 
-    - name: Linux Tests
-      if: startsWith(matrix.os, 'ubuntu')
+    - name: Tests
       run: |
         make test
+      working-directory: src/github.com/containerd/continuity
+
+    - name: Root Tests
+      if: ${{ !startsWith(matrix.os, 'windows') }}
+      run: |
         make root-test
       working-directory: src/github.com/containerd/continuity
-
-    - name: Non-Linux Tests
-      if: ${{ !startsWith(matrix.os, 'ubuntu') }}
-      shell: bash
-      run: make test-compile
-      working-directory: src/github.com/containerd/continuity
-
   cross:
     name: Cross-compile
     runs-on: ubuntu-22.04
