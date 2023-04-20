@@ -22,6 +22,7 @@ package fs
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 
@@ -89,11 +90,13 @@ func TestCopyIrregular(t *testing.T) {
 			t.Fatal(err)
 		}
 		prepared++
-		f2Socket := filepath.Join(src, "f2.sock")
-		if err := unix.Mknod(f2Socket, 0o600|unix.S_IFSOCK, 0); err != nil {
-			t.Fatal(err)
+		if runtime.GOOS != "darwin" {
+			f2Socket := filepath.Join(src, "f2.sock")
+			if err := unix.Mknod(f2Socket, 0o600|unix.S_IFSOCK, 0); err != nil {
+				t.Fatal(err)
+			}
+			prepared++
 		}
-		prepared++
 		f3Dev := filepath.Join(src, "f3.dev")
 		if err := unix.Mknod(f3Dev, 0o600|unix.S_IFCHR, 42); err != nil {
 			t.Logf("skipping testing S_IFCHR: %v", err)
