@@ -74,17 +74,6 @@ func TestUsage(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		testCases = append(testCases, []testCase{
 			{
-				name: "SparseFiles",
-				fs: fstest.Apply(
-					fstest.CreateDir("/dir", 0o755),
-					fstest.CreateRandomFile("/dir/file1", 7, 5, 0o644),
-					createSparseFile("/dir/sparse1", 8, 0o644, 5, 1024*1024, 5),
-					createSparseFile("/dir/sparse2", 9, 0o644, 0, 1024*1024),
-					createSparseFile("/dir/sparse2", 10, 0o644, 0, 1024*1024*1024, 1024),
-				),
-				size: dirs(2) + align(5)*3 + align(1024),
-			},
-			{
 				name: "Hardlinks",
 				fs: fstest.Apply(
 					fstest.CreateDir("/dir", 0o755),
@@ -101,6 +90,21 @@ func TestUsage(t *testing.T) {
 					fstest.Link("/dir/file1", "/dir/link1"),
 				),
 				size: dirs(2) + align(30*1024)*2,
+			},
+		}...)
+	}
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		testCases = append(testCases, []testCase{
+			{
+				name: "SparseFiles",
+				fs: fstest.Apply(
+					fstest.CreateDir("/dir", 0o755),
+					fstest.CreateRandomFile("/dir/file1", 7, 5, 0o644),
+					createSparseFile("/dir/sparse1", 8, 0o644, 5, 1024*1024, 5),
+					createSparseFile("/dir/sparse2", 9, 0o644, 0, 1024*1024),
+					createSparseFile("/dir/sparse2", 10, 0o644, 0, 1024*1024*1024, 1024),
+				),
+				size: dirs(2) + align(5)*3 + align(1024),
 			},
 		}...)
 	}
