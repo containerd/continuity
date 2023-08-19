@@ -93,7 +93,7 @@ jobs:
 
     strategy:
       matrix:
-        goos: [freebsd, openbsd, netbsd, darwin, solaris]
+        goos: [freebsd, openbsd, netbsd, dragonfly, darwin, solaris]
 
     steps:
     - name: Set up Go
