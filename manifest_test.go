@@ -41,7 +41,6 @@ import (
 //  3. ADS - no clue where to start.
 
 func TestWalkFS(t *testing.T) {
-	rand.Seed(1)
 
 	// Testing:
 	// 1. Setup different files:
@@ -219,6 +218,10 @@ const (
 	rnamedpipe
 )
 
+var (
+	rng = rand.New(rand.NewSource(1))
+)
+
 type dresource struct {
 	kind         kind
 	path         string
@@ -236,7 +239,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 		p := filepath.Join(root, resource.path)
 		switch resource.kind {
 		case rfile:
-			size := rand.Intn(4 << 20)
+			size := rng.Intn(4 << 20)
 			d := make([]byte, size)
 			randomBytes(d)
 			dgst := digest.FromBytes(d)
@@ -312,7 +315,7 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 
 func randomBytes(p []byte) {
 	for i := range p {
-		p[i] = byte(rand.Intn(1<<8 - 1))
+		p[i] = byte(rng.Intn(1<<8 - 1))
 	}
 }
 
