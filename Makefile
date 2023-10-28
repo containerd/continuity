@@ -28,7 +28,10 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     done | sort -u) \
     )
 
-.PHONY: clean all lint build test binaries
+GO_TEST_FLAGS?=
+GO_LDFLAGS?=
+
+.PHONY: clean all lint build test codecov binaries
 .DEFAULT: default
 
 all: AUTHORS clean lint build test binaries
@@ -53,11 +56,29 @@ build:
 
 test:
 	@echo "+ $@"
-	@go test -mod=vendor $(PACKAGES)
+	@go test -mod=vendor $(PACKAGES) $(GO_TEST_FLAGS)
 
 root-test:
 	@echo "+ $@"
-	@go test -exec sudo ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
+	@go test -exec sudo ${TEST_REQUIRES_ROOT_PACKAGES} -test.root $(GO_TEST_FLAGS)
+
+.PHONY: $(PREFIX)/codecov/unit
+$(PREFIX)/codecov/unit: GO_TEST_FLAGS+=-cover -covermode=atomic -args -test.gocoverdir=$@
+$(PREFIX)/codecov/unit:
+	@mkdir -p $@
+	@$(MAKE) test GO_TEST_FLAGS="$(GO_TEST_FLAGS)"
+
+.PHONY: $(PREFIX)/codecov/root
+$(PREFIX)/codecov/root: GO_TEST_FLAGS+=-cover -covermode=atomic -args -test.gocoverdir=$@
+$(PREFIX)/codecov/root:
+	@mkdir -p $@
+	@$(MAKE) root-test GO_TEST_FLAGS="$(GO_TEST_FLAGS)"
+
+codecov: $(PREFIX)/codecov/unit $(PREFIX)/codecov/root
+	@go tool covdata textfmt \
+		-i=$(PREFIX)/codecov/unit,$(PREFIX)/codecov/root \
+		-o $(PREFIX)/codecov/report.txt
+	@go tool cover -html=$(PREFIX)/codecov/report.txt -o $(PREFIX)/codecov/report.html
 
 test-compile:
 	@echo "+ $@"
@@ -70,4 +91,5 @@ binaries: ${PREFIX}/bin/continuity
 clean:
 	@echo "+ $@"
 	@rm -rf "${PREFIX}/bin/continuity" "${PREFIX}/bin/continuity.exe"
+	@rm -rf codecov/
 
