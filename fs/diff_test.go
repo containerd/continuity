@@ -22,11 +22,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
+	"github.com/containerd/continuity/testutil"
 )
 
 // TODO: Additional tests
@@ -38,6 +40,12 @@ import (
 func skipDiffTestOnWindows(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("diff implementation is incomplete on windows")
+	}
+}
+
+func skipDiffTestOnNonLinux(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("diff implementation is incomplete on %s", runtime.GOOS)
 	}
 }
 
@@ -189,6 +197,56 @@ func TestFileReplace(t *testing.T) {
 
 	if err := testDiffWithBase(t, l1, l2, diff); err != nil {
 		t.Fatalf("Failed diff with base: %+v", err)
+	}
+}
+
+func TestDiffDirChangeWithOverlayfs(t *testing.T) {
+	skipDiffTestOnNonLinux(t)
+	testutil.RequiresRoot(t)
+
+	l1 := fstest.Apply(
+		fstest.CreateDir("/dir1", 0700),
+		fstest.CreateFile("/dir1/f", []byte("/dir1/f"), 0644),
+		fstest.CreateDir("/dir1/d", 0700),
+		fstest.CreateFile("/dir1/d/f", []byte("/dir1/d/f"), 0644),
+
+		fstest.CreateDir("/dir2", 0700),
+		fstest.CreateDir("/dir2/d", 0700),
+		fstest.CreateFile("/dir2/d/f", []byte("/dir2/d/f"), 0644),
+
+		fstest.CreateDir("/dir3", 0700),
+		fstest.CreateFile("/dir3/f", []byte("/dir3/f"), 0644),
+	)
+
+	l2 := fstest.Apply(
+		fstest.CreateDir("/dir1", 0700),
+		fstest.CreateFile("/dir1/f", []byte("/dir1/f-diff"), 0644),
+		fstest.CreateDeviceFile("/dir1/d", os.ModeDevice|os.ModeCharDevice, 0, 0),
+
+		fstest.CreateDir("/dir2", 0700),
+		fstest.CreateDir("/dir2/d", 0700),
+		fstest.CreateFile("/dir2/d/f", []byte("/dir2/d/f-diff"), 0644),
+
+		fstest.CreateDir("/dir3", 0700),
+		// TODO(fuweid): check kernel version before apply
+		fstest.SetXAttr("/dir3", "user.overlay.opaque", "y"),
+	)
+
+	diff := []TestChange{
+		Modify("/dir1"),
+		Modify("/dir1/f"),
+		Delete("/dir1/d"),
+
+		Modify("/dir2"),
+		Modify("/dir2/d"),
+		Modify("/dir2/d/f"),
+
+		Modify("/dir3"),
+		Delete("/dir3/.wh..opq"),
+	}
+
+	if err := testDiffDirChange(l1, l2, DiffSourceOverlayFS, diff); err != nil {
+		t.Fatalf("failed diff dir change: %+v", err)
 	}
 }
 
@@ -350,7 +408,43 @@ func testDiffWithoutBase(t testing.TB, apply fstest.Applier, expected []TestChan
 	return checkChanges(tmp, changes, expected)
 }
 
+func testDiffDirChange(base, diff fstest.Applier, source DiffSource, expected []TestChange) error {
+	baseTmp, err := os.MkdirTemp("", "fast-diff-base-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(baseTmp)
+
+	diffTmp, err := os.MkdirTemp("", "fast-diff-diff-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(diffTmp)
+
+	if err := base.Apply(baseTmp); err != nil {
+		return fmt.Errorf("failed to apply filesytem changes: %w", err)
+	}
+
+	if err := diff.Apply(diffTmp); err != nil {
+		return fmt.Errorf("failed to apply filesytem changes: %w", err)
+	}
+
+	changes, err := collectDiffDirChanges(baseTmp, diffTmp, source)
+	if err != nil {
+		return fmt.Errorf("failed to collect diff dir changes: %w", err)
+	}
+	return checkChanges(diffTmp, changes, expected)
+}
+
 func checkChanges(root string, changes, expected []TestChange) error {
+	sort.Slice(changes, func(i, j int) bool {
+		return changes[i].Path < changes[j].Path
+	})
+
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i].Path < expected[j].Path
+	})
+
 	if len(changes) != len(expected) {
 		return fmt.Errorf("Unexpected number of changes:\n%s", diffString(changes, expected))
 	}
@@ -408,6 +502,26 @@ func collectChanges(a, b string) ([]TestChange, error) {
 		return nil, fmt.Errorf("failed to compute changes: %w", err)
 	}
 
+	return changes, nil
+}
+
+func collectDiffDirChanges(baseDir, diffDir string, source DiffSource) ([]TestChange, error) {
+	changes := []TestChange{}
+	err := DiffDirChanges(context.Background(), baseDir, diffDir, source, func(k ChangeKind, p string, f os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		changes = append(changes, TestChange{
+			Kind:     k,
+			Path:     p,
+			FileInfo: f,
+			Source:   filepath.Join(diffDir, p),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute changes: %w", err)
+	}
 	return changes, nil
 }
 
