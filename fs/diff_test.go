@@ -437,11 +437,11 @@ func testDiffDirChange(base, diff fstest.Applier, source DiffSource, expected []
 }
 
 func checkChanges(root string, changes, expected []TestChange) error {
-	sort.Slice(changes, func(i, j int) bool {
+	sort.SliceStable(changes, func(i, j int) bool {
 		return changes[i].Path < changes[j].Path
 	})
 
-	sort.Slice(expected, func(i, j int) bool {
+	sort.SliceStable(expected, func(i, j int) bool {
 		return expected[i].Path < expected[j].Path
 	})
 
