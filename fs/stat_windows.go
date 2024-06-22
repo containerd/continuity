@@ -1,6 +1,3 @@
-//go:build linux || openbsd || dragonfly || solaris
-// +build linux openbsd dragonfly solaris
-
 /*
    Copyright The containerd Authors.
 
@@ -20,26 +17,17 @@
 package fs
 
 import (
+	"fmt"
+	"io/fs"
 	"syscall"
 	"time"
 )
 
-// StatAtime returns the Atim
-func StatAtime(st *syscall.Stat_t) syscall.Timespec {
-	return st.Atim
-}
-
-// StatCtime returns the Ctim
-func StatCtime(st *syscall.Stat_t) syscall.Timespec {
-	return st.Ctim
-}
-
-// StatMtime returns the Mtim
-func StatMtime(st *syscall.Stat_t) syscall.Timespec {
-	return st.Mtim
-}
-
-// StatATimeAsTime returns st.Atim as a time.Time
-func StatATimeAsTime(st *syscall.Stat_t) time.Time {
-	return time.Unix(st.Atim.Unix())
+func Atime(st fs.FileInfo) (time.Time, error) {
+	stSys, ok := st.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return time.Time{}, fmt.Errorf("expected st.Sys() to be *syscall.Win32FileAttributeData, got %T", st.Sys())
+	}
+	// ref: https://github.com/golang/go/blob/go1.19.2/src/os/types_windows.go#L230
+	return time.Unix(0, stSys.LastAccessTime.Nanoseconds()), nil
 }
