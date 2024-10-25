@@ -86,7 +86,8 @@ func TestCopyReflinkWithXFS(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("Loopback file size (after copying a %d-byte file): %d", aSize, loopbackSize)
-	allowedSize := int64(120 << 20) // 120MB
+	// 170 MiB is needed since Ubuntu 24.04. 120 MiB was enough for Ubuntu 22.04.
+	allowedSize := int64(170 << 20)
 	if loopbackSize > allowedSize {
 		t.Fatalf("expected <= %d, got %d", allowedSize, loopbackSize)
 	}
