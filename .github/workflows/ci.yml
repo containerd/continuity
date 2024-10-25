@@ -16,7 +16,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -42,7 +42,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-24.04, macos-12, windows-2019, windows-2022]
 
     steps:
     - name: Set up Go
@@ -87,7 +87,7 @@ jobs:
       working-directory: src/github.com/containerd/continuity
   cross:
     name: Cross-compile
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [project]
 
