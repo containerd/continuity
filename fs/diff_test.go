@@ -204,50 +204,55 @@ func TestDiffDirChangeWithOverlayfs(t *testing.T) {
 	skipDiffTestOnNonLinux(t)
 	testutil.RequiresRoot(t)
 
-	l1 := fstest.Apply(
-		fstest.CreateDir("/dir1", 0700),
-		fstest.CreateFile("/dir1/f", []byte("/dir1/f"), 0644),
-		fstest.CreateDir("/dir1/d", 0700),
-		fstest.CreateFile("/dir1/d/f", []byte("/dir1/d/f"), 0644),
+	f := func() {
+		l1 := fstest.Apply(
+			fstest.CreateDir("/dir1", 0700),
+			fstest.CreateFile("/dir1/f", []byte("/dir1/f"), 0644),
+			fstest.CreateDir("/dir1/d", 0700),
+			fstest.CreateFile("/dir1/d/f", []byte("/dir1/d/f"), 0644),
 
-		fstest.CreateDir("/dir2", 0700),
-		fstest.CreateDir("/dir2/d", 0700),
-		fstest.CreateFile("/dir2/d/f", []byte("/dir2/d/f"), 0644),
+			fstest.CreateDir("/dir2", 0700),
+			fstest.CreateDir("/dir2/d", 0700),
+			fstest.CreateFile("/dir2/d/f", []byte("/dir2/d/f"), 0644),
 
-		fstest.CreateDir("/dir3", 0700),
-		fstest.CreateFile("/dir3/f", []byte("/dir3/f"), 0644),
-	)
+			fstest.CreateDir("/dir3", 0700),
+			fstest.CreateFile("/dir3/f", []byte("/dir3/f"), 0644),
+		)
 
-	l2 := fstest.Apply(
-		fstest.CreateDir("/dir1", 0700),
-		fstest.CreateFile("/dir1/f", []byte("/dir1/f-diff"), 0644),
-		fstest.CreateDeviceFile("/dir1/d", os.ModeDevice|os.ModeCharDevice, 0, 0),
+		l2 := fstest.Apply(
+			fstest.CreateDir("/dir1", 0700),
+			fstest.CreateFile("/dir1/f", []byte("/dir1/f-diff"), 0644),
+			fstest.CreateDeviceFile("/dir1/d", os.ModeDevice|os.ModeCharDevice, 0, 0),
 
-		fstest.CreateDir("/dir2", 0700),
-		fstest.CreateDir("/dir2/d", 0700),
-		fstest.CreateFile("/dir2/d/f", []byte("/dir2/d/f-diff"), 0644),
+			fstest.CreateDir("/dir2", 0700),
+			fstest.CreateDir("/dir2/d", 0700),
+			fstest.CreateFile("/dir2/d/f", []byte("/dir2/d/f-diff"), 0644),
 
-		fstest.CreateDir("/dir3", 0700),
-		// TODO(fuweid): check kernel version before apply
-		fstest.SetXAttr("/dir3", "user.overlay.opaque", "y"),
-	)
+			fstest.CreateDir("/dir3", 0700),
+			// TODO(fuweid): check kernel version before apply
+			fstest.SetXAttr("/dir3", "user.overlay.opaque", "y"),
+		)
 
-	diff := []TestChange{
-		Modify("/dir1"),
-		Modify("/dir1/f"),
-		Delete("/dir1/d"),
+		diff := []TestChange{
+			Modify("/dir1"),
+			Modify("/dir1/f"),
+			Delete("/dir1/d"),
 
-		Modify("/dir2"),
-		Modify("/dir2/d"),
-		Modify("/dir2/d/f"),
+			Modify("/dir2"),
+			Modify("/dir2/d"),
+			Modify("/dir2/d/f"),
 
-		Modify("/dir3"),
-		Delete("/dir3/.wh..opq"),
+			Modify("/dir3"),
+			Delete("/dir3/.wh..opq"),
+		}
+
+		if err := testDiffDirChange(l1, l2, DiffSourceOverlayFS, diff); err != nil {
+			t.Fatalf("failed diff dir change: %+v", err)
+		}
 	}
-
-	if err := testDiffDirChange(l1, l2, DiffSourceOverlayFS, diff); err != nil {
-		t.Fatalf("failed diff dir change: %+v", err)
-	}
+	// the test assumes ext4
+	// https://github.com/containerd/continuity/issues/247#issuecomment-2437014104
+	fstest.WithMkfs(t, f, "mkfs.ext4", "-F")
 }
 
 func TestParentDirectoryPermission(t *testing.T) {
