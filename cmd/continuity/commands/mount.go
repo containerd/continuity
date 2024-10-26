@@ -74,17 +74,8 @@ var MountCmd = &cobra.Command{
 			fuse.ReadOnly(),
 			fuse.FSName(manifestName),
 			fuse.Subtype("continuity"),
-			// OSX Only options
-			fuse.LocalVolume(),
-			fuse.VolumeName("Continuity FileSystem"),
 		)
 		if err != nil {
-			log.L.Fatal(err)
-		}
-
-		<-c.Ready
-		if err := c.MountError; err != nil {
-			c.Close()
 			log.L.Fatal(err)
 		}
 
