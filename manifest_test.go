@@ -26,6 +26,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"syscall"
 	"testing"
@@ -198,12 +199,15 @@ func (k kind) String() string {
 		return "directory"
 	case rhardlink:
 		return "hardlink"
+	case rrelsymlink:
+		return "relsymlink"
+	case rabssymlink:
+		return "abssymlink"
 	case rchardev:
 		return "chardev"
 	case rnamedpipe:
 		return "namedpipe"
 	}
-
 	panic(fmt.Sprintf("unknown kind: %v", int(k)))
 }
 
@@ -429,4 +433,43 @@ func expectedResourceList(root string, resources []dresource) ([]Resource, error
 	}
 
 	return manifestResources, nil
+}
+
+func TestKindString(t *testing.T) {
+	kinds := []kind{
+		rfile,
+		rdirectory,
+		rhardlink,
+		rrelsymlink,
+		rabssymlink,
+		rchardev,
+		rnamedpipe,
+	}
+
+	expected := []string{
+		"file",
+		"directory",
+		"hardlink",
+		"relsymlink",
+		"abssymlink",
+		"chardev",
+		"namedpipe",
+	}
+
+	var actual []string
+	for _, k := range kinds {
+		actual = append(actual, k.String())
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected: %v, got: %v", expected, actual)
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("should panic on unknown kind")
+		}
+	}()
+
+	var unknownKind = rnamedpipe + 1
+	_ = unknownKind.String()
 }
