@@ -20,7 +20,6 @@
 package commands
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -33,7 +32,7 @@ import (
 	"github.com/containerd/continuity"
 	"github.com/containerd/continuity/cmd/continuity/continuityfs"
 	"github.com/containerd/continuity/driver"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/log"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +41,7 @@ var MountCmd = &cobra.Command{
 	Short: "Mount the manifest to the provided mountpoint using content from a source directory",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) != 3 {
-			log.Fatal("Must specify mountpoint, manifest, and source directory")
+			log.L.Fatal("Must specify mountpoint, manifest, and source directory")
 		}
 		mountpoint := args[0]
 		manifest, source := args[1], args[2]
@@ -51,24 +50,24 @@ var MountCmd = &cobra.Command{
 
 		p, err := os.ReadFile(manifest)
 		if err != nil {
-			log.Fatalf("error reading manifest: %v", err)
+			log.L.Fatalf("error reading manifest: %v", err)
 		}
 
 		m, err := continuity.Unmarshal(p)
 		if err != nil {
-			log.Fatalf("error unmarshaling manifest: %v", err)
+			log.L.Fatalf("error unmarshaling manifest: %v", err)
 		}
 
 		driver, err := driver.NewSystemDriver()
 		if err != nil {
-			logrus.Fatal(err)
+			log.L.Fatal(err)
 		}
 
 		provider := continuityfs.NewFSFileContentProvider(source, driver)
 
 		contfs, err := continuityfs.NewFSFromManifest(m, mountpoint, provider)
 		if err != nil {
-			logrus.Fatal(err)
+			log.L.Fatal(err)
 		}
 
 		c, err := fuse.Mount(
@@ -81,13 +80,13 @@ var MountCmd = &cobra.Command{
 			fuse.VolumeName("Continuity FileSystem"),
 		)
 		if err != nil {
-			logrus.Fatal(err)
+			log.L.Fatal(err)
 		}
 
 		<-c.Ready
 		if err := c.MountError; err != nil {
 			c.Close()
-			logrus.Fatal(err)
+			log.L.Fatal(err)
 		}
 
 		errChan := make(chan error, 1)
@@ -105,27 +104,27 @@ var MountCmd = &cobra.Command{
 
 		select {
 		case <-sigChan:
-			logrus.Infof("Shutting down")
+			log.L.Infof("Shutting down")
 		case err = <-errChan:
 		}
 
 		go func() {
 			if err := c.Close(); err != nil {
-				logrus.Errorf("Unable to close connection %s", err)
+				log.L.Errorf("Unable to close connection %s", err)
 			}
 		}()
 
 		// Wait for any inprogress requests to be handled
 		time.Sleep(time.Second)
 
-		logrus.Infof("Attempting unmount")
+		log.L.Info("Attempting unmount")
 		if err := fuse.Unmount(mountpoint); err != nil {
-			logrus.Errorf("Error unmounting %s: %v", mountpoint, err)
+			log.L.Errorf("Error unmounting %s: %v", mountpoint, err)
 		}
 
 		// Handle server error
 		if err != nil {
-			logrus.Fatalf("Error serving fuse server: %v", err)
+			log.L.Fatalf("Error serving fuse server: %v", err)
 		}
 	},
 }

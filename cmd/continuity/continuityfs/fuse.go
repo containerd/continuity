@@ -31,8 +31,8 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"github.com/containerd/continuity"
+	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 )
 
 // File represents any file type (non directory) in the filesystem
@@ -93,7 +93,7 @@ func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 	// TODO(dmcgowan): else check if device can be opened for read
 	r, err := f.provider.Open(f.resource.Path(), dgst)
 	if err != nil {
-		logrus.Debugf("Error opening handle: %v", err)
+		log.G(ctx).Debugf("Error opening handle: %v", err)
 		return nil, err
 	}
 	return &fileHandler{
@@ -132,7 +132,7 @@ func (h *fileHandler) Read(ctx context.Context, req *fuse.ReadRequest, resp *fus
 	if h.offset != req.Offset {
 		if seeker, ok := h.reader.(io.Seeker); ok {
 			if _, err := seeker.Seek(req.Offset, io.SeekStart); err != nil {
-				logrus.Debugf("Error seeking: %v", err)
+				log.G(ctx).Debugf("Error seeking: %v", err)
 				return err
 			}
 			h.offset = req.Offset
@@ -143,7 +143,7 @@ func (h *fileHandler) Read(ctx context.Context, req *fuse.ReadRequest, resp *fus
 
 	n, err := h.reader.Read(resp.Data[:req.Size])
 	if err != nil {
-		logrus.Debugf("Read error: %v", err)
+		log.G(ctx).Debugf("Read error: %v", err)
 		return err
 	}
 	h.offset = h.offset + int64(n)
@@ -214,7 +214,7 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 			}
 			ents = append(ents, de)
 		} else {
-			logrus.Errorf("%s does not have a directory entry", name)
+			log.G(ctx).Errorf("%s does not have a directory entry", name)
 		}
 	}
 
@@ -249,7 +249,7 @@ func addNode(path string, node fs.Node, cache map[string]*Dir, provider FileCont
 		addNode(filepath.Clean(dirPath), d, cache, provider)
 	}
 	d.nodes[file] = node
-	logrus.Debugf("%s (%#v) added to %s", file, node, dirPath)
+	log.G(context.TODO()).Debugf("%s (%#v) added to %s", file, node, dirPath)
 }
 
 type treeRoot struct {
@@ -257,7 +257,7 @@ type treeRoot struct {
 }
 
 func (t treeRoot) Root() (fs.Node, error) {
-	logrus.Debugf("Returning root with %#v", t.root.nodes)
+	log.G(context.TODO()).Debugf("Returning root with %#v", t.root.nodes)
 	return t.root, nil
 }
 
