@@ -1,5 +1,4 @@
 //go:build windows || solaris || openbsd || netbsd || dragonfly || darwin
-// +build windows solaris openbsd netbsd dragonfly darwin
 
 /*
    Copyright The containerd Authors.
