@@ -78,11 +78,11 @@ func MarshalText(w io.Writer, m *Manifest) error {
 }
 
 // BuildManifest creates the manifest for the given context
-func BuildManifest(ctx Context) (*Manifest, error) {
+func BuildManifest(fsContext Context) (*Manifest, error) {
 	resourcesByPath := map[string]Resource{}
 	hardLinks := newHardlinkManager()
 
-	if err := ctx.Walk(func(p string, fi os.FileInfo, err error) error {
+	if err := fsContext.Walk(func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("error walking %s: %w", p, err)
 		}
@@ -92,7 +92,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 			return nil
 		}
 
-		resource, err := ctx.Resource(p, fi)
+		resource, err := fsContext.Resource(p, fi)
 		if err != nil {
 			if err == ErrNotFound {
 				return nil
@@ -141,9 +141,9 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 
 // VerifyManifest verifies all the resources in a manifest
 // against files from the given context.
-func VerifyManifest(ctx Context, manifest *Manifest) error {
+func VerifyManifest(fsContext Context, manifest *Manifest) error {
 	for _, resource := range manifest.Resources {
-		if err := ctx.Verify(resource); err != nil {
+		if err := fsContext.Verify(resource); err != nil {
 			return err
 		}
 	}
@@ -153,9 +153,9 @@ func VerifyManifest(ctx Context, manifest *Manifest) error {
 
 // ApplyManifest applies on the resources in a manifest to
 // the given context.
-func ApplyManifest(ctx Context, manifest *Manifest) error {
+func ApplyManifest(fsContext Context, manifest *Manifest) error {
 	for _, resource := range manifest.Resources {
-		if err := ctx.Apply(resource); err != nil {
+		if err := fsContext.Apply(resource); err != nil {
 			return err
 		}
 	}
