@@ -154,7 +154,10 @@ func TestWalkFS(t *testing.T) {
 	}
 
 	var b bytes.Buffer
-	MarshalText(&b, m)
+	err = MarshalText(&b, m)
+	if err != nil {
+		t.Fatalf("error marshaling manifest: %v", err)
+	}
 	t.Log(b.String())
 
 	// TODO(dmcgowan): always verify, currently hard links not supported
