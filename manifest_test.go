@@ -154,13 +154,16 @@ func TestWalkFS(t *testing.T) {
 	}
 
 	var b bytes.Buffer
-	MarshalText(&b, m)
+	err = MarshalText(&b, m)
+	if err != nil {
+		t.Fatalf("error marshaling manifest: %v", err)
+	}
 	t.Log(b.String())
 
 	// TODO(dmcgowan): always verify, currently hard links not supported
-	//if err := VerifyManifest(ctx, m); err != nil {
+	// if err := VerifyManifest(ctx, m); err != nil {
 	//	t.Fatalf("error verifying manifest: %v")
-	//}
+	// }
 
 	expectedResources, err := expectedResourceList(root, testResources)
 	if err != nil {
@@ -238,9 +241,9 @@ type dresource struct {
 }
 
 func generateTestFiles(t *testing.T, root string, resources []dresource) {
-	for i, resource := range resources {
-		p := filepath.Join(root, resource.path)
-		switch resource.kind {
+	for i, rsrc := range resources {
+		p := filepath.Join(root, rsrc.path)
+		switch rsrc.kind {
 		case rfile:
 			size := rng.Intn(4 << 20)
 			d := make([]byte, size)
@@ -250,35 +253,35 @@ func generateTestFiles(t *testing.T, root string, resources []dresource) {
 			resources[i].size = size
 
 			// this relies on the proper directory parent being defined.
-			if err := os.WriteFile(p, d, resource.mode); err != nil {
+			if err := os.WriteFile(p, d, rsrc.mode); err != nil {
 				t.Fatalf("error writing %q: %v", p, err)
 			}
 		case rdirectory:
-			if err := os.Mkdir(p, resource.mode); err != nil {
+			if err := os.Mkdir(p, rsrc.mode); err != nil {
 				t.Fatalf("error creating directory %q: %v", p, err)
 			}
 		case rhardlink:
-			target := filepath.Join(root, resource.target)
+			target := filepath.Join(root, rsrc.target)
 			if err := os.Link(target, p); err != nil {
 				t.Fatalf("error creating hardlink: %v", err)
 			}
 		case rrelsymlink:
-			if err := os.Symlink(resource.target, p); err != nil {
+			if err := os.Symlink(rsrc.target, p); err != nil {
 				t.Fatalf("error creating symlink: %v", err)
 			}
 		case rabssymlink:
 			// for absolute links, we join with root.
-			target := filepath.Join(root, resource.target)
+			target := filepath.Join(root, rsrc.target)
 
 			if err := os.Symlink(target, p); err != nil {
 				t.Fatalf("error creating symlink: %v", err)
 			}
 		case rchardev, rnamedpipe:
-			if err := devices.Mknod(p, resource.mode, resource.major, resource.minor); err != nil {
+			if err := devices.Mknod(p, rsrc.mode, rsrc.major, rsrc.minor); err != nil {
 				t.Fatalf("error creating device %q: %v", p, err)
 			}
 		default:
-			t.Fatalf("unknown resource type: %v", resource.kind)
+			t.Fatalf("unknown resource type: %v", rsrc.kind)
 		}
 
 		st, err := os.Lstat(p)
