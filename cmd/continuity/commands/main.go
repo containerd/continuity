@@ -22,8 +22,8 @@ import (
 	"text/tabwriter"
 
 	pb "github.com/containerd/continuity/proto"
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/proto"
 )
 
 var (

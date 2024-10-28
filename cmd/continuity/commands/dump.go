@@ -17,13 +17,15 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 
 	pb "github.com/containerd/continuity/proto"
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
 )
 
 var DumpCmd = &cobra.Command{
@@ -51,10 +53,7 @@ var DumpCmd = &cobra.Command{
 			log.Fatalf("error unmarshaling manifest: %v", err)
 		}
 
-		// TODO(stevvooe): For now, just dump the text format. Turn this into
-		// nice text output later.
-		if err := proto.MarshalText(os.Stdout, &bm); err != nil {
-			log.Fatalf("error dumping manifest: %v", err)
-		}
+		// TODO(stevvooe): For now, just dump the text format. Turn this into nice text output later.
+		_, _ = fmt.Fprintln(os.Stdout, prototext.Format(&bm))
 	},
 }
