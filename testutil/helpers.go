@@ -20,8 +20,10 @@ import (
 	"flag"
 )
 
-var rootEnabled bool
-
 func init() {
-	flag.BoolVar(&rootEnabled, "test.root", false, "enable tests that require root")
+	if flag.Lookup("test.root") == nil { // avoid conflict with containerd testutil
+		var dummy bool
+		// Register this dummy flag for compatibility with existing test scripts
+		flag.BoolVar(&dummy, "test.root", false, "(Ignored)")
+	}
 }

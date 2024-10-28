@@ -36,10 +36,6 @@ func Unmount(t *testing.T, mountPoint string) {
 // RequiresRoot skips tests that require root, unless the test.root flag has
 // been set
 func RequiresRoot(t testing.TB) {
-	if !rootEnabled {
-		t.Skip("skipping test that requires root")
-		return
-	}
 	if os.Getuid() != 0 {
 		t.Error("This test must be run as root.")
 	}
