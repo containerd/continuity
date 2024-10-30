@@ -197,7 +197,7 @@ type direnter interface {
 func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	node, ok := d.nodes[name]
 	if !ok {
-		return nil, fuse.ENOENT
+		return nil, syscall.ENOENT
 	}
 	return node, nil
 }

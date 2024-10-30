@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"text/tabwriter"
 
+	"github.com/containerd/continuity/proto"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 )
@@ -42,17 +44,28 @@ var LSCmd = &cobra.Command{
 		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 
 		for _, entry := range bm.Resource {
+			user, group := getUserGroup(entry)
 			for _, path := range entry.Path {
 				if os.FileMode(entry.Mode)&os.ModeSymlink != 0 {
-					//nolint:unconvert
-					fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v -> %v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path, entry.Target)
+					_, _ = fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v -> %v\n", os.FileMode(entry.Mode), user, group, humanize.Bytes(uint64(entry.Size)), path, entry.Target) //nolint:unconvert
 				} else {
-					//nolint:unconvert
-					fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n", os.FileMode(entry.Mode), entry.User, entry.Group, humanize.Bytes(uint64(entry.Size)), path)
+					_, _ = fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n", os.FileMode(entry.Mode), user, group, humanize.Bytes(uint64(entry.Size)), path) //nolint:unconvert
 				}
 			}
 		}
 
-		w.Flush()
+		_ = w.Flush()
 	},
+}
+
+func getUserGroup(entry *proto.Resource) (user, group string) {
+	user = entry.User //nolint:staticcheck // ignore SA1019: entry.User is deprecated.
+	if user == "" {
+		user = strconv.FormatInt(entry.Uid, 10)
+	}
+	group = entry.Group //nolint:staticcheck // ignore SA1019: entry.Group is deprecated.
+	if group == "" {
+		group = strconv.FormatInt(entry.Gid, 10)
+	}
+	return user, group
 }
