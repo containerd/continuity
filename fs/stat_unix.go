@@ -30,7 +30,7 @@ func Atime(st fs.FileInfo) (time.Time, error) {
 	if !ok {
 		return time.Time{}, fmt.Errorf("expected st.Sys() to be *syscall.Stat_t, got %T", st.Sys())
 	}
-	return StatATimeAsTime(stSys), nil
+	return time.Unix(stSys.Atim.Unix()), nil
 }
 
 func Ctime(st fs.FileInfo) (time.Time, error) {
