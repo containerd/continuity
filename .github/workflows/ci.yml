@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 100
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -42,11 +42,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-24.04, macos-15-intel, windows-2019, windows-2022]
 
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
 
@@ -97,7 +97,7 @@ jobs:
 
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
 
