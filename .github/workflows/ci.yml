@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/continuity
           fetch-depth: 100
@@ -57,7 +57,7 @@ jobs:
         git config --global core.eol lf
 
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: src/github.com/containerd/continuity
         fetch-depth: 25
@@ -107,7 +107,7 @@ jobs:
         echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: src/github.com/containerd/continuity
 
