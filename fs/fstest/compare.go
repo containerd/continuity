@@ -18,18 +18,19 @@ package fstest
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 )
 
 // CheckDirectoryEqual compares two directory paths to make sure that
 // the content of the directories is the same.
 func CheckDirectoryEqual(d1, d2 string) error {
-	r1, err := buildResources(d1)
+	r1, err := buildResourcesFS(os.DirFS(d1))
 	if err != nil {
 		return fmt.Errorf("failed to walk %s: %w", d1, err)
 	}
 
-	r2, err := buildResources(d2)
+	r2, err := buildResourcesFS(os.DirFS(d2))
 	if err != nil {
 		return fmt.Errorf("failed to walk %s: %w", d2, err)
 	}
@@ -53,4 +54,30 @@ func CheckDirectoryEqualWithApplier(root string, a Applier) error {
 		return err
 	}
 	return CheckDirectoryEqual(applied, root)
+}
+
+// CheckDirectoryEqualFS compares two fs.FS implementations to make
+// sure that the content of the file systems is the same.
+//
+// If an fs.FS also implements [fs.ReadLinkFS], symbolic link targets
+// will be compared. Otherwise only the presence of symlinks is checked.
+// Both fs.FS values should have the same fs.ReadLinkFS capability to
+// avoid false differences from asymmetric symlink target data.
+func CheckDirectoryEqualFS(fs1, fs2 fs.FS) error {
+	r1, err := buildResourcesFS(fs1)
+	if err != nil {
+		return fmt.Errorf("failed to walk: %w", err)
+	}
+
+	r2, err := buildResourcesFS(fs2)
+	if err != nil {
+		return fmt.Errorf("failed to walk: %w", err)
+	}
+
+	diff := diffResourceList(r1, r2)
+	if diff.HasDiff() {
+		return fmt.Errorf("directory diff:\n%s", diff.String())
+	}
+
+	return nil
 }

@@ -19,8 +19,7 @@ package fstest
 import (
 	"crypto/sha256"
 	"io"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"sort"
 )
 
@@ -28,7 +27,7 @@ import (
 type resource struct {
 	path   string
 	paths  []string // all paths, including hardlinks (sorted)
-	mode   os.FileMode
+	mode   fs.FileMode
 	uid    int64
 	gid    int64
 	size   int64
@@ -38,103 +37,101 @@ type resource struct {
 	minor  uint64            // devices only
 }
 
-// buildResources walks root and returns a sorted list of resources.
-func buildResources(root string) ([]resource, error) {
-	root, err := filepath.Abs(root)
-	if err != nil {
-		return nil, err
-	}
-
-	type entry struct {
-		res resource
-		fi  os.FileInfo
-	}
-
-	// hlKey -> index into entries for the first file with that inode.
+// buildResourcesFS walks fsys and returns a sorted list of resources.
+func buildResourcesFS(fsys fs.FS) ([]resource, error) {
 	hardlinks := map[hardlinkKey]int{}
-	var entries []entry
+	var entries []resource
 
-	err = filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
+	rlfs, hasReadLink := fsys.(fs.ReadLinkFS)
+
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			return err
-		}
-		// Use absolute-style paths like continuity does (rooted at "/").
-		rel = "/" + filepath.ToSlash(rel)
-		if rel == "/." {
-			// skip root directory itself
+		if p == "." {
 			return nil
 		}
 
+		fi, err := d.Info()
+		if err != nil {
+			return err
+		}
+
 		r := resource{
-			path: rel,
+			path: p,
 			mode: fi.Mode(),
 		}
 		statResource(fi, &r)
 
-		if fi.Mode().IsRegular() {
+		switch {
+		case fi.Mode().IsRegular():
 			r.size = fi.Size()
-			h, err := hashFile(p)
+
+			// Check for hardlink before hashing to avoid redundant I/O.
+			if key, ok := getHardlinkKey(fi); ok {
+				if idx, exists := hardlinks[key]; exists {
+					entries[idx].paths = append(entries[idx].paths, p)
+					return nil
+				}
+				hardlinks[key] = len(entries)
+			}
+
+			h, err := hashFileFS(fsys, p)
 			if err != nil {
 				return err
 			}
 			r.sha256 = h
 
-			// Check for hardlink.
+		case fi.Mode()&fs.ModeSymlink != 0:
+			if hasReadLink {
+				target, err := rlfs.ReadLink(p)
+				if err != nil {
+					return err
+				}
+				r.target = target
+			}
+
+		case fi.Mode()&fs.ModeDevice != 0:
+			r.major, r.minor = getDeviceInfo(fi)
 			if key, ok := getHardlinkKey(fi); ok {
 				if idx, exists := hardlinks[key]; exists {
-					// Merge into existing entry.
-					entries[idx].res.paths = append(entries[idx].res.paths, rel)
+					entries[idx].paths = append(entries[idx].paths, p)
 					return nil
 				}
 				hardlinks[key] = len(entries)
 			}
-		} else if fi.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(p)
-			if err != nil {
-				return err
-			}
-			r.target = target
-		} else if fi.Mode()&os.ModeDevice != 0 {
-			r.major, r.minor = getDeviceInfo(fi)
-		} else if fi.Mode()&os.ModeNamedPipe != 0 {
-			// Check for hardlink on named pipes.
+
+		case fi.Mode()&fs.ModeNamedPipe != 0:
 			if key, ok := getHardlinkKey(fi); ok {
 				if idx, exists := hardlinks[key]; exists {
-					entries[idx].res.paths = append(entries[idx].res.paths, rel)
+					entries[idx].paths = append(entries[idx].paths, p)
 					return nil
 				}
 				hardlinks[key] = len(entries)
 			}
 		}
 
-		r.paths = []string{rel}
-		entries = append(entries, entry{res: r, fi: fi})
+		r.paths = []string{p}
+		entries = append(entries, r)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	resources := make([]resource, len(entries))
-	for i, e := range entries {
-		sort.Strings(e.res.paths)
-		e.res.path = e.res.paths[0]
-		resources[i] = e.res
+	for i := range entries {
+		sort.Strings(entries[i].paths)
+		entries[i].path = entries[i].paths[0]
 	}
-	sort.Slice(resources, func(i, j int) bool {
-		return resources[i].path < resources[j].path
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].path < entries[j].path
 	})
 
-	return resources, nil
+	return entries, nil
 }
 
-func hashFile(path string) ([sha256.Size]byte, error) {
-	f, err := os.Open(path)
+func hashFileFS(fsys fs.FS, name string) ([sha256.Size]byte, error) {
+	f, err := fsys.Open(name)
 	if err != nil {
 		return [sha256.Size]byte{}, err
 	}

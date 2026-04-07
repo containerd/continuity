@@ -19,7 +19,7 @@ package fstest
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"io/fs"
 )
 
 type resourceUpdate struct {
@@ -149,11 +149,11 @@ func compareResourceType(r1, r2 resource) bool {
 		return true
 	case mode.IsDir():
 		return true
-	case mode&os.ModeSymlink != 0:
+	case mode&fs.ModeSymlink != 0:
 		return r1.target == r2.target
-	case mode&os.ModeNamedPipe != 0:
+	case mode&fs.ModeNamedPipe != 0:
 		return true
-	case mode&os.ModeDevice != 0:
+	case mode&fs.ModeDevice != 0:
 		return r1.major == r2.major && r1.minor == r2.minor
 	default:
 		return true

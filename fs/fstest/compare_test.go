@@ -20,6 +20,7 @@ import (
 	"os"
 	"runtime"
 	"testing"
+	"testing/fstest"
 )
 
 func TestCheckDirectoryEqualBasic(t *testing.T) {
@@ -213,7 +214,69 @@ func TestCheckDirectoryEqualWithApplier(t *testing.T) {
 	}
 }
 
-func TestBuildResources(t *testing.T) {
+func TestCheckDirectoryEqualFS(t *testing.T) {
+	fs1 := fstest.MapFS{
+		"a/b": &fstest.MapFile{Data: []byte("hello"), Mode: 0o644},
+		"a/c": &fstest.MapFile{Data: []byte("world"), Mode: 0o644},
+		"d":   &fstest.MapFile{Mode: 0o755 | os.ModeDir},
+		"d/e": &fstest.MapFile{Data: []byte("data"), Mode: 0o600},
+	}
+	fs2 := fstest.MapFS{
+		"a/b": &fstest.MapFile{Data: []byte("hello"), Mode: 0o644},
+		"a/c": &fstest.MapFile{Data: []byte("world"), Mode: 0o644},
+		"d":   &fstest.MapFile{Mode: 0o755 | os.ModeDir},
+		"d/e": &fstest.MapFile{Data: []byte("data"), Mode: 0o600},
+	}
+
+	if err := CheckDirectoryEqualFS(fs1, fs2); err != nil {
+		t.Fatalf("identical MapFS should be equal: %v", err)
+	}
+}
+
+func TestCheckDirectoryEqualFSDifference(t *testing.T) {
+	fs1 := fstest.MapFS{
+		"f": &fstest.MapFile{Data: []byte("aaa"), Mode: 0o644},
+	}
+	fs2 := fstest.MapFS{
+		"f": &fstest.MapFile{Data: []byte("bbb"), Mode: 0o644},
+	}
+
+	if err := CheckDirectoryEqualFS(fs1, fs2); err == nil {
+		t.Fatal("MapFS with different content should not be equal")
+	}
+}
+
+func TestCheckDirectoryEqualFSExtraFile(t *testing.T) {
+	fs1 := fstest.MapFS{
+		"f1": &fstest.MapFile{Data: []byte("hello"), Mode: 0o644},
+	}
+	fs2 := fstest.MapFS{
+		"f1": &fstest.MapFile{Data: []byte("hello"), Mode: 0o644},
+		"f2": &fstest.MapFile{Data: []byte("extra"), Mode: 0o644},
+	}
+
+	if err := CheckDirectoryEqualFS(fs1, fs2); err == nil {
+		t.Fatal("MapFS with extra file should not be equal")
+	}
+}
+
+func TestCheckDirectoryEqualFSSymlinkTarget(t *testing.T) {
+	fs1 := fstest.MapFS{
+		"link": &fstest.MapFile{Data: []byte("target1"), Mode: os.ModeSymlink | 0o777},
+	}
+	fs2 := fstest.MapFS{
+		"link": &fstest.MapFile{Data: []byte("target2"), Mode: os.ModeSymlink | 0o777},
+	}
+
+	if err := CheckDirectoryEqualFS(fs1, fs1); err != nil {
+		t.Fatalf("identical MapFS symlinks should be equal: %v", err)
+	}
+	if err := CheckDirectoryEqualFS(fs1, fs2); err == nil {
+		t.Fatal("MapFS with different symlink targets should not be equal")
+	}
+}
+
+func TestBuildResourcesFS(t *testing.T) {
 	d := t.TempDir()
 
 	a := Apply(
@@ -226,12 +289,12 @@ func TestBuildResources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resources, err := buildResources(d)
+	resources, err := buildResourcesFS(os.DirFS(d))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Should have 4 entries: /a, /a/f1, /b, /c
+	// Should have 4 entries: a, a/f1, b, c
 	if len(resources) != 4 {
 		t.Fatalf("expected 4 resources, got %d", len(resources))
 	}
@@ -246,28 +309,56 @@ func TestBuildResources(t *testing.T) {
 	// Verify types
 	for _, r := range resources {
 		switch r.path {
-		case "/a":
+		case "a":
 			if !r.mode.IsDir() {
-				t.Errorf("/a should be directory, got %v", r.mode)
+				t.Errorf("a should be directory, got %v", r.mode)
 			}
-		case "/a/f1":
+		case "a/f1":
 			if !r.mode.IsRegular() {
-				t.Errorf("/a/f1 should be regular file, got %v", r.mode)
+				t.Errorf("a/f1 should be regular file, got %v", r.mode)
 			}
 			if r.size != 3 {
-				t.Errorf("/a/f1 should have size 3, got %d", r.size)
+				t.Errorf("a/f1 should have size 3, got %d", r.size)
 			}
-		case "/b":
+		case "b":
 			if !r.mode.IsRegular() {
-				t.Errorf("/b should be regular file, got %v", r.mode)
+				t.Errorf("b should be regular file, got %v", r.mode)
 			}
-		case "/c":
+		case "c":
 			if r.mode&os.ModeSymlink == 0 {
-				t.Errorf("/c should be symlink, got %v", r.mode)
+				t.Errorf("c should be symlink, got %v", r.mode)
 			}
 			if r.target != "b" {
-				t.Errorf("/c target should be 'b', got %q", r.target)
+				t.Errorf("c target should be 'b', got %q", r.target)
 			}
+		}
+	}
+}
+
+func TestBuildResourcesFSMapFS(t *testing.T) {
+	mfs := fstest.MapFS{
+		"dir":      &fstest.MapFile{Mode: 0o755 | os.ModeDir},
+		"dir/file": &fstest.MapFile{Data: []byte("content"), Mode: 0o644},
+		"other":    &fstest.MapFile{Data: []byte("other"), Mode: 0o600},
+	}
+
+	resources, err := buildResourcesFS(mfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(resources))
+	}
+
+	paths := make([]string, len(resources))
+	for i, r := range resources {
+		paths[i] = r.path
+	}
+	expected := []string{"dir", "dir/file", "other"}
+	for i, p := range expected {
+		if paths[i] != p {
+			t.Errorf("resource %d: expected path %q, got %q", i, p, paths[i])
 		}
 	}
 }

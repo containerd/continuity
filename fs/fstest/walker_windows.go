@@ -16,18 +16,18 @@
 
 package fstest
 
-import "os"
+import "io/fs"
 
 type hardlinkKey struct{}
 
-func statResource(fi os.FileInfo, r *resource) {
+func statResource(fi fs.FileInfo, r *resource) {
 	// Windows does not support uid/gid.
 }
 
-func getHardlinkKey(fi os.FileInfo) (hardlinkKey, bool) {
+func getHardlinkKey(fi fs.FileInfo) (hardlinkKey, bool) {
 	return hardlinkKey{}, false
 }
 
-func getDeviceInfo(fi os.FileInfo) (major, minor uint64) {
+func getDeviceInfo(fi fs.FileInfo) (major, minor uint64) {
 	return 0, 0
 }

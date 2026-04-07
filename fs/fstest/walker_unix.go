@@ -19,7 +19,7 @@
 package fstest
 
 import (
-	"os"
+	"io/fs"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -30,14 +30,14 @@ type hardlinkKey struct {
 	inode uint64
 }
 
-func statResource(fi os.FileInfo, r *resource) {
+func statResource(fi fs.FileInfo, r *resource) {
 	if sys, ok := fi.Sys().(*syscall.Stat_t); ok {
 		r.uid = int64(sys.Uid)
 		r.gid = int64(sys.Gid)
 	}
 }
 
-func getHardlinkKey(fi os.FileInfo) (hardlinkKey, bool) {
+func getHardlinkKey(fi fs.FileInfo) (hardlinkKey, bool) {
 	sys, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok || sys.Nlink < 2 {
 		return hardlinkKey{}, false
@@ -46,7 +46,7 @@ func getHardlinkKey(fi os.FileInfo) (hardlinkKey, bool) {
 	return hardlinkKey{dev: uint64(sys.Dev), inode: uint64(sys.Ino)}, true
 }
 
-func getDeviceInfo(fi os.FileInfo) (major, minor uint64) {
+func getDeviceInfo(fi fs.FileInfo) (major, minor uint64) {
 	sys, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
 		return 0, 0
