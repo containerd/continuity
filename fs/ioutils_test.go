@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package continuity
+package fs
 
 import (
 	"bytes"

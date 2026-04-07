@@ -17,17 +17,19 @@
 package continuity
 
 import (
-	"bytes"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/containerd/continuity/fs"
 )
 
 // AtomicWriteFile atomically writes data to a file by first writing to a
 // temp file and calling rename.
+//
+// Deprecated: Use github.com/containerd/continuity/fs.AtomicWriteFile instead.
 func AtomicWriteFile(filename string, data []byte, perm os.FileMode) error {
-	buf := bytes.NewBuffer(data)
-	return atomicWriteFile(filename, buf, int64(len(data)), perm)
+	return fs.AtomicWriteFile(filename, data, perm)
 }
 
 // atomicWriteFile writes data to a file by first writing to a temp
