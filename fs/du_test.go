@@ -82,8 +82,12 @@ func TestUsage(t *testing.T) {
 				),
 				size: dirs(2) + align(60*1024),
 			},
+		}...)
+	}
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		testCases = append(testCases, []testCase{
 			{
-				name: "HardlinkSparefile",
+				name: "HardlinkSparsefile",
 				fs: fstest.Apply(
 					fstest.CreateDir("/dir", 0o755),
 					createSparseFile("/dir/file1", 10, 0o644, 30*1024, 1024*1024*1024, 30*1024),

@@ -16,21 +16,21 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           path: src/github.com/containerd/continuity
           fetch-depth: 100
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: containerd/project-checks@v1.2.2
+      - uses: containerd/project-checks@d7751f3c375b8fe4a84c02a068184ee4c1f59bc4 # v1.2.2
         with:
           working-directory: src/github.com/containerd/continuity
 
@@ -42,11 +42,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-latest, ubuntu-24.04, macos-latest, windows-latest, windows-2022]
 
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version: ${{ env.GO_VERSION }}
 
@@ -57,7 +57,7 @@ jobs:
         git config --global core.eol lf
 
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
         path: src/github.com/containerd/continuity
         fetch-depth: 25
@@ -87,7 +87,7 @@ jobs:
       working-directory: src/github.com/containerd/continuity
   cross:
     name: Cross-compile
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [project]
 
@@ -97,7 +97,7 @@ jobs:
 
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version: ${{ env.GO_VERSION }}
 
@@ -107,7 +107,7 @@ jobs:
         echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
         path: src/github.com/containerd/continuity
 
