@@ -1,5 +1,3 @@
-//go:build !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -18,10 +16,18 @@
 
 package fstest
 
-import (
-	"testing"
-)
+import "os"
 
-func WithMkfs(t *testing.T, f func(), mkfs ...string) {
-	t.Fatal("WithMkfs requires Linux")
+type hardlinkKey struct{}
+
+func statResource(fi os.FileInfo, r *resource) {
+	// Windows does not support uid/gid.
+}
+
+func getHardlinkKey(fi os.FileInfo) (hardlinkKey, bool) {
+	return hardlinkKey{}, false
+}
+
+func getDeviceInfo(fi os.FileInfo) (major, minor uint64) {
+	return 0, 0
 }
