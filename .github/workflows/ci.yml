@@ -9,6 +9,9 @@ on:
 env:
   GO_VERSION: 1.22.x
 
+permissions:
+  contents: read
+
 jobs:
 
   #
