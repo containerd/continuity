@@ -8,6 +8,11 @@ github.com/Microsoft/go-winio/pkg/guid
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
+# github.com/erofs/go-erofs v0.3.1-0.20260531080512-069dc32d83e6
+## explicit; go 1.23
+github.com/erofs/go-erofs
+github.com/erofs/go-erofs/internal/builder
+github.com/erofs/go-erofs/internal/disk
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
