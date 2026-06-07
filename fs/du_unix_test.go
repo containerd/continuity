@@ -26,6 +26,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 func getBsize(root string) (int64, error) {
@@ -91,3 +92,52 @@ func duCheck(root string) (usage int64, err error) {
 
 	return blocks * blocksUnitSize, nil
 }
+
+func TestFileInfoStat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		sys     any
+		wantErr bool
+	}{
+		{
+			name:    "valid stat",
+			sys:     &syscall.Stat_t{},
+			wantErr: false,
+		},
+		{
+			name:    "typed nil stat",
+			sys:     (*syscall.Stat_t)(nil),
+			wantErr: true,
+		},
+		{
+			name:    "unexpected stat type",
+			sys:     struct{}{},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := fileInfoStat("/tmp/file", fakeFileInfo{sys: tc.sys})
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("fileInfoStat() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+type fakeFileInfo struct {
+	sys any
+}
+
+func (fi fakeFileInfo) Name() string       { return "file" }
+func (fi fakeFileInfo) Size() int64        { return 0 }
+func (fi fakeFileInfo) Mode() os.FileMode  { return 0 }
+func (fi fakeFileInfo) ModTime() time.Time { return time.Time{} }
+func (fi fakeFileInfo) IsDir() bool        { return false }
+func (fi fakeFileInfo) Sys() any           { return fi.sys }
