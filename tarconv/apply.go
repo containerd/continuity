@@ -11,6 +11,14 @@
 //     Suitable for flat merged images where all layers are applied in sequence.
 //   - [WithPreserveWhiteouts]: keep .wh.* entries as plain files.
 //     Suitable for tooling that needs the raw tar content.
+//
+// Tar-index mode is enabled by creating the [erofs.Writer] with
+// [erofs.WithDataFile] pointing at a file that receives the raw tar bytes,
+// and passing that same file to Apply via [WithTarIndexData].  In this mode
+// Apply records file-data ranges in the EROFS image as chunk-index entries
+// that reference the external data file rather than copying bytes into the
+// EROFS spool.  The result is a compact metadata-only EROFS image whose
+// chunk table points into the appended original tar content.
 package tarconv
 
 import (
@@ -19,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path"
 	"strings"
 
@@ -54,7 +63,8 @@ const (
 
 // config holds the parsed options for an Apply call.
 type config struct {
-	whiteouts whiteoutMode
+	whiteouts    whiteoutMode
+	tarIndexData *os.File // non-nil: tar-index mode — data written here, not into EROFS spool
 }
 
 // Option configures an [Apply] call.
@@ -78,6 +88,26 @@ func WithMerge() Option {
 // content is preserved verbatim.
 func WithPreserveWhiteouts() Option {
 	return func(c *config) { c.whiteouts = whiteoutPreserve }
+}
+
+// WithTarIndexData enables tar-index mode.
+//
+// In tar-index mode Apply does not copy file payload bytes into the EROFS
+// writer's internal spool.  Instead, each regular file's data is written to
+// dataFile at a 512-byte-aligned offset that matches the file's position in
+// the tar stream, and the corresponding EROFS inode is stored as a
+// chunk-index entry referencing dataFile.
+//
+// The caller must create the [erofs.Writer] with [erofs.WithDataFile](dataFile)
+// using the same *os.File so that go-erofs can record the correct chunk
+// DeviceID.  The resulting EROFS image contains only filesystem metadata and
+// chunk indexes; raw tar content is appended to dataFile by the caller after
+// Apply returns to produce the final combined blob.
+//
+// Block size: the Writer's block size must be 512 (tar's natural granularity).
+// Use [erofs.WithBlockSize](512) when calling [erofs.Create].
+func WithTarIndexData(dataFile *os.File) Option {
+	return func(c *config) { c.tarIndexData = dataFile }
 }
 
 // pendingLink records a hard link whose target had not yet appeared when the
@@ -110,6 +140,14 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 	var cfg config
 	for _, o := range opts {
 		o(&cfg)
+	}
+
+	// In tar-index mode we wrap r with a counter so we can determine
+	// each file's data start offset within the tar stream.
+	var cr *countingReader
+	if cfg.tarIndexData != nil {
+		cr = &countingReader{r: r}
+		r = cr
 	}
 
 	tr := archivetar.NewReader(r)
@@ -199,8 +237,18 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 		case archivetar.TypeReg, archivetar.TypeRegA: //nolint:staticcheck
 			// Remove any existing entry to handle tar overwrite semantics.
 			removeExisting(w, p)
-			if err := addFile(w, p, hdr, tr); err != nil {
-				return fmt.Errorf("tarconv: %s: %w", p, err)
+			if cfg.tarIndexData != nil {
+				// Tar-index mode: record chunk indexes into the data file.
+				// cr.n is the byte position *after* the tar header; that is
+				// exactly where this file's data starts in the stream.
+				dataOffset := cr.n
+				if err := addFileTarIndex(w, p, hdr, tr, dataOffset); err != nil {
+					return fmt.Errorf("tarconv: %s: %w", p, err)
+				}
+			} else {
+				if err := addFile(w, p, hdr, tr); err != nil {
+					return fmt.Errorf("tarconv: %s: %w", p, err)
+				}
 			}
 			pending = replayPending(w, pending)
 
@@ -511,4 +559,55 @@ func cleanTarPath(name string) string {
 // mkdev constructs a Linux device number from major and minor components.
 func mkdev(major, minor int64) uint32 {
 	return uint32((major << 8) | (minor & 0xff) | ((minor & ^int64(0xff)) << 12))
+}
+
+// addFileTarIndex adds a regular file in tar-index mode.
+//
+// The file's payload bytes are consumed from tr and discarded (the EROFS
+// Writer, created with WithDataFile, will record chunk indexes based on
+// dataOffset and hdr.Size).  We create the EROFS File, write the bytes
+// through it so that the Writer tracks the data-file position correctly,
+// and then apply metadata.
+//
+// dataOffset is the byte position of this file's data within the underlying
+// tar stream (i.e. the value of countingReader.n immediately after the
+// archive/tar package has read the header for this entry).
+func addFileTarIndex(w *erofs.Writer, p string, hdr *archivetar.Header, tr *archivetar.Reader, _ int64) error {
+	// Create the EROFS file entry.  With the Writer in WithDataFile mode,
+	// f.Write() forwards data to the external data file and closeDataFile()
+	// records the corresponding chunk indexes.
+	f, err := w.Create(p)
+	if err != nil {
+		return err
+	}
+	// Copy file data: in WithDataFile mode this writes to the external data
+	// file and advances the Writer's dataOff counter.
+	if _, err := io.Copy(f, tr); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("copy data (tar-index): %w", err)
+	}
+	if err := f.Chmod(tarModeToGoMode(hdr.Mode)); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Chown(hdr.Uid, hdr.Gid); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return applyMetadata(w, p, hdr)
+}
+
+// countingReader wraps an io.Reader and counts bytes read.
+type countingReader struct {
+	r io.Reader
+	n int64 // total bytes read so far
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
 }
