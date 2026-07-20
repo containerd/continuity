@@ -18,7 +18,7 @@
 // via direct writer calls, without staging an intermediate fs.FS.
 //
 // The single entry point is [Apply]. It handles all tar entry types (regular
-// files, directories, symlinks, hard links, device nodes, FIFOs) and three
+// files, directories, symlinks, hard links, device nodes, FIFOs) and four
 // whiteout strategies selectable via options:
 //
 //   - Default (no option): translate AUFS/OCI whiteouts to overlayfs xattrs.
@@ -27,6 +27,9 @@
 //     Suitable for flat merged images where all layers are applied in sequence.
 //   - [WithPreserveWhiteouts]: keep .wh.* entries as plain files.
 //     Suitable for tooling that needs the raw tar content.
+//   - [WithStripWhiteouts]: drop .wh.* entries entirely.
+//     Suitable for the bottommost layer of a chain, where no lower layer
+//     exists for a whiteout to hide.
 //
 // Tar-index mode is enabled by creating the [erofs.Writer] with
 // [erofs.WithDataFile] pointing at a file that receives the raw tar bytes,
@@ -75,6 +78,9 @@ const (
 	whiteoutMerge
 	// whiteoutPreserve keeps whiteout entries as plain regular files.
 	whiteoutPreserve
+	// whiteoutStrip drops whiteout entries entirely: neither translated,
+	// preserved, nor acted on.
+	whiteoutStrip
 )
 
 // config holds the parsed options for an Apply call.
@@ -104,6 +110,15 @@ func WithMerge() Option {
 // content is preserved verbatim.
 func WithPreserveWhiteouts() Option {
 	return func(c *config) { c.whiteouts = whiteoutPreserve }
+}
+
+// WithStripWhiteouts makes Apply drop .wh.* and .wh..wh..opq entries
+// entirely: they are neither translated to overlayfs representation nor
+// preserved as plain files. Use this for the bottommost layer of a chain,
+// where no lower layer exists for a whiteout to hide, so the whiteout
+// carries no meaning.
+func WithStripWhiteouts() Option {
+	return func(c *config) { c.whiteouts = whiteoutStrip }
 }
 
 // WithTarIndexData enables tar-index mode.
@@ -147,6 +162,7 @@ type pendingLink struct {
 //
 // Use [WithMerge] to resolve whiteouts structurally instead (flat merged image).
 // Use [WithPreserveWhiteouts] to keep whiteout entries as plain files.
+// Use [WithStripWhiteouts] to drop whiteout entries entirely.
 //
 // Hard links may appear in any order. Links whose targets have not yet appeared
 // are queued and resolved as subsequent entries are processed. An unresolved
@@ -212,6 +228,8 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 					if err := setOpaqueXattr(w, dir, hdr); err != nil {
 						return fmt.Errorf("tarconv: opaque %s: %w", dir, err)
 					}
+				case whiteoutStrip:
+					// Nothing below this layer to hide; drop the marker.
 				}
 			} else {
 				target := path.Join(dir, base[len(whiteoutPrefix):])
@@ -241,6 +259,8 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 						}
 						pendingOrigin[dir] = true
 					}
+				case whiteoutStrip:
+					// Nothing below this layer to hide; drop the marker.
 				}
 			}
 			// Drain any data bytes (whiteouts are zero-size in practice but be safe).

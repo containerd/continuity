@@ -596,6 +596,52 @@ func TestConvertWhiteouts(t *testing.T) {
 	}
 }
 
+// TestStripWhiteouts checks that WithStripWhiteouts drops whiteout entries
+// entirely: no overlay char device, no opaque xattr, no origin xattr.
+func TestStripWhiteouts(t *testing.T) {
+	tarData := makeTar(t, func(tw *tar.Writer) {
+		tw.WriteHeader(&tar.Header{Typeflag: tar.TypeDir, Name: "lib/", Mode: 0o755, ModTime: epoch})
+		tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "lib/.wh..wh..opq", Size: 0, ModTime: epoch})
+		tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "lib/.wh.removed.so", Size: 0, ModTime: epoch})
+		tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "lib/kept.so", Size: 4, Mode: 0o644, ModTime: epoch})
+		tw.Write([]byte("keep"))
+	})
+	out := &buf{}
+	w := erofs.Create(out)
+	if err := tarconv.Apply(w, bytes.NewReader(tarData), tarconv.WithStripWhiteouts()); err != nil {
+		t.Fatalf("Apply(WithStripWhiteouts): %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Writer.Close: %v", err)
+	}
+	img := out.b
+	fsckImage(t, img)
+	fsys := openImage(t, img)
+
+	// Neither whiteout name should exist as an entry of any kind.
+	if _, err := fs.Stat(fsys, "lib/removed.so"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("lib/removed.so: expected ErrNotExist, got %v", err)
+	}
+	if _, err := fs.Stat(fsys, "lib/.wh.removed.so"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("lib/.wh.removed.so: expected ErrNotExist (not preserved), got %v", err)
+	}
+	if _, err := fs.Stat(fsys, "lib/.wh..wh..opq"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("lib/.wh..wh..opq: expected ErrNotExist (not preserved), got %v", err)
+	}
+
+	// lib itself should carry neither the opaque nor the origin xattr.
+	info := checkStat(t, fsys, "lib")
+	st := info.Sys().(*erofs.Stat)
+	if _, ok := st.Xattrs[overlayOpaqueXattr]; ok {
+		t.Errorf("lib: unexpected opaque xattr, xattrs=%v", st.Xattrs)
+	}
+	if _, ok := st.Xattrs["trusted.overlay.origin"]; ok {
+		t.Errorf("lib: unexpected trusted.overlay.origin, xattrs=%v", st.Xattrs)
+	}
+
+	checkFile(t, fsys, "lib/kept.so", "keep")
+}
+
 // TestConvertOpaqueBeforeDir tests that the opaque xattr is applied even when
 // the .wh..wh..opq entry appears before the directory entry itself.
 func TestConvertOpaqueBeforeDir(t *testing.T) {
