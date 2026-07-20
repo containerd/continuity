@@ -128,6 +128,81 @@ func TestCopyFileSparse(t *testing.T) {
 	}
 }
 
+func TestCopyFileSparseWithSync(t *testing.T) {
+	dir := t.TempDir()
+
+	type testCase struct {
+		name  string
+		parts []int64
+	}
+
+	tests := []testCase{
+		{
+			name:  "DataHoleData",
+			parts: []int64{4096, 1024 * 1024, 4096},
+		},
+		{
+			name:  "NoHoles",
+			parts: []int64{64 * 1024},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srcPath := filepath.Join(dir, tc.name+"-sync-src")
+			dstPath := filepath.Join(dir, tc.name+"-sync-dst")
+
+			applier := createSparseFile(tc.name+"-sync-src", 42, 0o644, tc.parts...)
+			if err := applier.Apply(dir); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := CopyFile(dstPath, srcPath, WithFileSync()); err != nil {
+				t.Fatalf("CopyFile with WithFileSync failed: %v", err)
+			}
+
+			// Verify content matches exactly.
+			srcData, err := os.ReadFile(srcPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dstData, err := os.ReadFile(dstPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(srcData, dstData) {
+				t.Fatal("source and destination file contents differ")
+			}
+
+			// Verify sparseness is preserved.
+			srcStat, err := os.Stat(srcPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dstStat, err := os.Stat(dstPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			srcBlocks := srcStat.Sys().(*syscall.Stat_t).Blocks
+			dstBlocks := dstStat.Sys().(*syscall.Stat_t).Blocks
+
+			t.Logf("src size=%d blocks=%d, dst size=%d blocks=%d",
+				srcStat.Size(), srcBlocks, dstStat.Size(), dstBlocks)
+
+			if srcStat.Size() != dstStat.Size() {
+				t.Fatalf("size mismatch: src=%d dst=%d", srcStat.Size(), dstStat.Size())
+			}
+
+			maxBlocks := srcBlocks + srcBlocks/10 + 8
+			if dstBlocks > maxBlocks {
+				t.Fatalf("destination is not sparse: src blocks=%d, dst blocks=%d (max allowed=%d)",
+					srcBlocks, dstBlocks, maxBlocks)
+			}
+		})
+	}
+}
+
 func TestCopyReflinkWithXFS(t *testing.T) {
 	testutil.RequiresRoot(t)
 	mnt := t.TempDir()
