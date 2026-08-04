@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -17,19 +19,18 @@
 package fs
 
 import (
-	"errors"
 	"fmt"
-
-	"golang.org/x/sys/unix"
+	"os"
 )
 
-func copyFile(target, source string, sync bool) error {
-	if err := unix.Clonefile(source, target, unix.CLONE_NOFOLLOW); err != nil {
-		if !errors.Is(err, unix.ENOTSUP) && !errors.Is(err, unix.EXDEV) {
-			return fmt.Errorf("clonefile failed: %w", err)
-		}
-
-		return openAndCopyFile(target, source, sync)
+func syncDirectory(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return fmt.Errorf("failed to open directory for sync %s: %w", dir, err)
+	}
+	defer d.Close()
+	if err := d.Sync(); err != nil {
+		return fmt.Errorf("failed to sync directory %s: %w", dir, err)
 	}
 	return nil
 }

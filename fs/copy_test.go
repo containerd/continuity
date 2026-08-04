@@ -124,3 +124,166 @@ func benchmarkLargeCopyFile(b *testing.B, size int64) {
 		os.RemoveAll(copied)
 	}
 }
+
+func TestCopyFileWithSync(t *testing.T) {
+	dir := t.TempDir()
+	src := dir + "/src"
+	dst := dir + "/dst"
+
+	data := []byte("this is a file sync test")
+	if err := os.WriteFile(src, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyFile(dst, src, WithFileSync()); err != nil {
+		t.Fatalf("CopyFile with WithFileSync failed: %v", err)
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(data) {
+		t.Fatalf("content mismatch: got %q, want %q", got, data)
+	}
+}
+
+func TestCopyFileWithoutSync(t *testing.T) {
+	dir := t.TempDir()
+	src := dir + "/src"
+	dst := dir + "/dst"
+
+	data := []byte("this is a no-sync test")
+	if err := os.WriteFile(src, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyFile(dst, src); err != nil {
+		t.Fatalf("CopyFile without sync failed: %v", err)
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(data) {
+		t.Fatalf("content mismatch: got %q, want %q", got, data)
+	}
+}
+
+func TestCopyDirWithFileSync(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+
+	apply := fstest.Apply(
+		fstest.CreateDir("/subdir", 0o755),
+		fstest.CreateFile("/subdir/file.txt", []byte("this is a file sync test"), 0o644),
+		fstest.CreateFile("/root.txt", []byte("root file"), 0o644),
+	)
+	if err := apply.Apply(src); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyDir(dst, src, WithCopyFileSync()); err != nil {
+		t.Fatalf("CopyDir with WithCopyFileSync failed: %v", err)
+	}
+
+	if err := fstest.CheckDirectoryEqual(src, dst); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCopyDirWithDirSync(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+
+	apply := fstest.Apply(
+		fstest.CreateDir("/subdir", 0o755),
+		fstest.CreateFile("/subdir/file.txt", []byte("this is a dir sync test"), 0o644),
+		fstest.CreateFile("/root.txt", []byte("root file"), 0o644),
+	)
+	if err := apply.Apply(src); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyDir(dst, src, WithCopyDirSync()); err != nil {
+		t.Fatalf("CopyDir with WithCopyDirSync failed: %v", err)
+	}
+
+	if err := fstest.CheckDirectoryEqual(src, dst); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func BenchmarkCopyFile(b *testing.B) {
+	benchmarkCopyFile(b, false)
+}
+
+func BenchmarkCopyFileWithSync(b *testing.B) {
+	benchmarkCopyFile(b, true)
+}
+
+func benchmarkCopyFile(b *testing.B, sync bool) {
+	b.StopTimer()
+	base := b.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateRandomFile("/benchfile", time.Now().UnixNano(), 10*1024*1024, 0o644),
+	)
+	if err := apply.Apply(base); err != nil {
+		b.Fatal("failed to apply changes:", err)
+	}
+	src := base + "/benchfile"
+
+	var opts []CopyFileOpt
+	if sync {
+		opts = append(opts, WithFileSync())
+	}
+
+	for i := 0; i < b.N; i++ {
+		dst := b.TempDir() + "/dst"
+		b.StartTimer()
+		if err := CopyFile(dst, src, opts...); err != nil {
+			b.Fatal("failed to copy:", err)
+		}
+		b.StopTimer()
+	}
+}
+
+func BenchmarkCopyDir(b *testing.B) {
+	benchmarkCopyDir(b, false)
+}
+
+func BenchmarkCopyDirWithSync(b *testing.B) {
+	benchmarkCopyDir(b, true)
+}
+
+func benchmarkCopyDir(b *testing.B, sync bool) {
+	b.StopTimer()
+	base := b.TempDir()
+
+	appliers := []fstest.Applier{
+		fstest.CreateDir("/manyfiles", 0o755),
+	}
+	for i := 0; i < 500; i++ {
+		appliers = append(appliers,
+			fstest.CreateRandomFile(fmt.Sprintf("/manyfiles/file_%04d", i), int64(i), 4096, 0o644),
+		)
+	}
+	if err := fstest.Apply(appliers...).Apply(base); err != nil {
+		b.Fatal("failed to apply:", err)
+	}
+
+	var opts []CopyDirOpt
+	if sync {
+		opts = append(opts, WithCopyDirSync())
+	}
+
+	for i := 0; i < b.N; i++ {
+		dst := b.TempDir()
+		b.StartTimer()
+		if err := CopyDir(dst, base+"/manyfiles", opts...); err != nil {
+			b.Fatal("failed to copy:", err)
+		}
+		b.StopTimer()
+	}
+}
