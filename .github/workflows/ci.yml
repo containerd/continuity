@@ -7,7 +7,14 @@ on:
     branches: [ main ]
 
 env:
-  GO_VERSION: 1.22.x
+  # actions/setup-go resolves 'stable' to the latest Go release and 'oldstable'
+  # to the one before it, so these never need a manual bump. Jobs that only need
+  # a single Go version use GO_VERSION; the test matrix builds against both.
+  GO_VERSION: stable
+  GOLANGCI_LINT_VERSION: v2.15.0
+  # Fail loudly instead of silently downloading a toolchain if a go.mod ever
+  # requires a Go version newer than the one installed by actions/setup-go.
+  GOTOOLCHAIN: local
 
 permissions:
   contents: read
@@ -37,6 +44,53 @@ jobs:
         with:
           working-directory: src/github.com/containerd/continuity
 
+  #
+  # golangci-lint
+  #
+  linters:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+    name: Linters
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Git line endings
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: src/github.com/containerd/continuity
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          skip-cache: true
+          working-directory: src/github.com/containerd/continuity
+
+      - name: Lint cmd/continuity
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          skip-cache: true
+          args: --config=../../.golangci.yml
+          working-directory: src/github.com/containerd/continuity/cmd/continuity
+
   tests:
     name: CI Tests
     runs-on: ${{ matrix.os }}
@@ -44,14 +98,17 @@ jobs:
     needs: [project]
 
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04, macos-latest, windows-latest, windows-2022]
+        # Build and test against the latest Go release and the one before it.
+        go: [oldstable, stable]
 
     steps:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: ${{ env.GO_VERSION }}
+        go-version: ${{ matrix.go }}
 
     - name: Git line endings
       shell: bash
@@ -64,14 +121,6 @@ jobs:
       with:
         path: src/github.com/containerd/continuity
         fetch-depth: 25
-
-    - name: Dependencies
-      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
-
-    - name: Lint
-      shell: bash
-      run: make lint
-      working-directory: src/github.com/containerd/continuity
 
     - name: Build
       shell: bash
