@@ -135,10 +135,6 @@ func copyFile(target, source string) error {
 		offset = holeStart
 	}
 
-	if err := tgt.Sync(); err != nil {
-		return fmt.Errorf("failed to sync target %s: %w", target, err)
-	}
-
 	return nil
 }
 
