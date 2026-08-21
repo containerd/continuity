@@ -20,10 +20,13 @@ package fs
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/bits-and-blooms/bloom/v3"
 )
 
 // blocksUnitSize is the unit used by `st_blocks` in `stat` in bytes.
@@ -58,12 +61,46 @@ func fileInfoStat(path string, fi os.FileInfo) (*syscall.Stat_t, error) {
 	return stat, nil
 }
 
+type InodeStore struct {
+	filter *bloom.BloomFilter
+	real   map[inode]struct{}
+}
+
+func NewInodeStore(expectedItems uint, falsePositiveRate float64) *InodeStore {
+	return &InodeStore{
+		filter: bloom.NewWithEstimates(expectedItems, falsePositiveRate),
+		real:   make(map[inode]struct{}, expectedItems),
+	}
+}
+
+func (s *InodeStore) Add(i inode) {
+	b := i.MarshalToBuf()
+	s.filter.Add(b)
+	s.real[i] = struct{}{}
+}
+
+func (s *InodeStore) Exists(i inode) bool {
+	b := i.MarshalToBuf()
+	if !s.filter.Test(b) {
+		return false
+	}
+	_, ok := s.real[i]
+	return ok
+}
+
+func (i inode) MarshalToBuf() []byte {
+	var arr [16]byte
+	binary.BigEndian.PutUint64(arr[0:8], i.dev)
+	binary.BigEndian.PutUint64(arr[8:16], i.ino)
+	return arr[:]
+}
+
 func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 	var (
 		size   int64
 		inodes = map[inode]struct{}{} // expensive!
 	)
-
+	store := NewInodeStore(500000, 0.01)
 	for _, root := range roots {
 		if err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
@@ -81,11 +118,10 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 				return err
 			}
 			inoKey := newInode(stat)
-			if _, ok := inodes[inoKey]; !ok {
-				inodes[inoKey] = struct{}{}
+			if ok := store.Exists(inoKey); !ok {
+				store.Add(inoKey)
 				size += stat.Blocks * blocksUnitSize
 			}
-
 			return nil
 		}); err != nil {
 			return Usage{}, err
