@@ -16,20 +16,7 @@
 
 package fs
 
-import (
-	"errors"
-	"fmt"
-
-	"golang.org/x/sys/unix"
-)
-
-func copyFile(target, source string, sync bool) error {
-	if err := unix.Clonefile(source, target, unix.CLONE_NOFOLLOW); err != nil {
-		if !errors.Is(err, unix.ENOTSUP) && !errors.Is(err, unix.EXDEV) {
-			return fmt.Errorf("clonefile failed: %w", err)
-		}
-
-		return openAndCopyFile(target, source, sync)
-	}
+// syncDirectory is a no-op on Windows, which does not support fsync on directories.
+func syncDirectory(dir string) error {
 	return nil
 }
