@@ -142,6 +142,26 @@ func TestUsage(t *testing.T) {
 	}
 }
 
+func TestHandleWalkError(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("root")
+	missing := filepath.Join(root, "removed")
+	notExistErr := &os.PathError{Op: "lstat", Path: missing, Err: os.ErrNotExist}
+
+	if err := handleWalkError(root, missing, notExistErr); err != nil {
+		t.Fatalf("expected missing child to be ignored, got %v", err)
+	}
+	if err := handleWalkError(root, root, notExistErr); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected missing root error, got %v", err)
+	}
+
+	permissionErr := &os.PathError{Op: "open", Path: missing, Err: os.ErrPermission}
+	if err := handleWalkError(root, missing, permissionErr); !errors.Is(err, os.ErrPermission) {
+		t.Fatalf("expected permission error, got %v", err)
+	}
+}
+
 // createSparseFile creates a sparse file filled with random
 // bytes for data parts
 // The parse alternate data length, hole length, data length, ....
