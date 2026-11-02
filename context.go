@@ -587,10 +587,7 @@ func (c *context) Walk(fn filepath.WalkFunc) error {
 	root := c.root
 	fi, err := c.driver.Lstat(c.root)
 	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
-		root, err = c.driver.Readlink(c.root)
-		if err != nil {
-			return err
-		}
+		root += string(c.pathDriver.Separator())
 	}
 	return c.pathDriver.Walk(root, func(p string, fi os.FileInfo, _ error) error {
 		contained, err := c.containWithRoot(p, root)
