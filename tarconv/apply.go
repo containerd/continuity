@@ -283,7 +283,9 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 				delete(pendingOrigin, p)
 			}
 
-		case archivetar.TypeReg, archivetar.TypeRegA: //nolint:staticcheck
+		// archive/tar reconstructs the contents of an old GNU sparse file,
+		// holes included, but keeps its type flag.
+		case archivetar.TypeReg, archivetar.TypeRegA, archivetar.TypeGNUSparse: //nolint:staticcheck
 			// Remove any existing entry to handle tar overwrite semantics.
 			removeExisting(w, p)
 			if cfg.tarIndexData != nil {
