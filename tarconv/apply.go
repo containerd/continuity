@@ -200,6 +200,11 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 	// set once their TypeDir entry appears (handles whiteout-before-dir order).
 	var pendingOrigin map[string]bool
 
+	// whiteouts records the paths this layer whited out in convert mode, so
+	// a directory recreated at one of them can be told apart from the
+	// whiteout and made opaque.
+	var whiteouts whiteoutSet
+
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -212,6 +217,12 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 		p := cleanTarPath(hdr.Name)
 		base := path.Base(p)
 		dir := path.Dir(p)
+
+		// An entry beneath a path this layer whited out recreates the
+		// directories above it as opaque directories.
+		if err := whiteouts.recreateAbove(w, dir); err != nil {
+			return fmt.Errorf("tarconv: %s: %w", p, err)
+		}
 
 		// --- Whiteout detection ---
 		// OCI whiteouts use TypeReg. Detect by name prefix and dispatch
@@ -246,6 +257,7 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 					if err := emitWhiteout(w, target, hdr); err != nil {
 						return fmt.Errorf("tarconv: whiteout %s: %w", target, err)
 					}
+					whiteouts.add(target)
 					// Set trusted.overlay.origin="" on the parent directory to
 					// match mkfs.erofs --aufs behaviour for regular whiteouts.
 					if _, serr := w.Stat(dir); serr == nil {
@@ -268,6 +280,16 @@ func Apply(w *erofs.Writer, r io.Reader, opts ...Option) error {
 				return fmt.Errorf("tarconv: drain %s: %w", p, err)
 			}
 			continue
+		}
+
+		// A directory recreated at a path this layer whited out becomes an
+		// opaque directory. Any other entry there replaces the whiteout as
+		// usual; the path stays recorded, so a directory added there later is
+		// still made opaque.
+		if hdr.Typeflag == archivetar.TypeDir {
+			if err := whiteouts.recreateAbove(w, p); err != nil {
+				return fmt.Errorf("tarconv: %s: %w", p, err)
+			}
 		}
 
 		// --- Normal entry dispatch ---
@@ -370,12 +392,23 @@ func addDir(w *erofs.Writer, p string, hdr *archivetar.Header) error {
 		// Tar archives commonly emit directory entries multiple times (once
 		// implicitly when a child is created, once explicitly with metadata).
 		// If the path already exists as a directory treat it as a metadata update.
-		if isDuplicatePath(err) {
-			if info, serr := w.Stat(p); serr == nil && info.IsDir() {
-				return applyMetadata(w, p, hdr)
-			}
+		if !isDuplicatePath(err) {
+			return err
 		}
-		return err
+		info, serr := w.Lstat(p)
+		if serr != nil {
+			return err
+		}
+		if info.IsDir() {
+			return applyMetadata(w, p, hdr)
+		}
+		// A directory replaces an earlier entry of another type at its path.
+		if rerr := w.Remove(p); rerr != nil {
+			return rerr
+		}
+		if err := w.Mkdir(p, tarModeToGoMode(hdr.Mode)); err != nil {
+			return err
+		}
 	}
 	return applyMetadata(w, p, hdr)
 }
@@ -489,6 +522,54 @@ func removeChildren(w *erofs.Writer, dir string) error {
 // the same path.
 func removeExisting(w *erofs.Writer, p string) {
 	_ = w.RemoveAll(p)
+}
+
+// whiteoutSet records the paths a layer whited out in convert mode.
+// recreateAbove replaces a recorded whiteout at a path or one of its ancestors
+// with an opaque directory. A whiteout followed by entries at or below its
+// path means the layer deleted the directory and recreated it, so the
+// directory must hide the lower layers' contents.
+type whiteoutSet struct {
+	paths map[string]struct{}
+	// clean is a directory with no recorded whiteout at or above it, as of
+	// the last change to paths. Tar entries are grouped by directory, so most
+	// entries are checked against the same directory in a row.
+	clean string
+}
+
+func (s *whiteoutSet) add(p string) {
+	if s.paths == nil {
+		s.paths = make(map[string]struct{})
+	}
+	s.paths[p] = struct{}{}
+	s.clean = ""
+}
+
+func (s *whiteoutSet) recreateAbove(w *erofs.Writer, p string) error {
+	if len(s.paths) == 0 || p == s.clean {
+		return nil
+	}
+	// Only the topmost recorded whiteout on the path still exists: whiting
+	// out a directory removed any whiteout recorded beneath it. p is clean
+	// and absolute, so its ancestors are its prefixes up to each "/".
+	top := ""
+	for a := p; len(a) > 1; a = a[:max(strings.LastIndexByte(a, '/'), 1)] {
+		if _, ok := s.paths[a]; ok {
+			delete(s.paths, a)
+			top = a
+		}
+	}
+	s.clean = p
+	if top == "" {
+		return nil
+	}
+	if err := w.Remove(top); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err := w.Mkdir(top, 0o755); err != nil {
+		return err
+	}
+	return w.Setxattr(top, overlayOpaqueXattr, "y")
 }
 
 // applyMetadata applies uid/gid, mtime, full mode (including special bits),
