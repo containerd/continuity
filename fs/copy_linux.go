@@ -122,8 +122,10 @@ func copyFile(target, source string, sync bool) error {
 			n, err := copyFileRange(srcFd, &srcOff, tgtFd, &tgtOff, int(chunk), 0)
 			if err != nil {
 				// Fall back to a plain copy if copy_file_range is not supported
-				// across the source and target filesystems.
-				if errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.ENOSYS) || errors.Is(err, syscall.EOPNOTSUPP) {
+				// across the source and target filesystems, or at all.
+				// Some filesystems (for example eCryptfs) return EINVAL
+				// instead of EOPNOTSUPP when they do not implement it.
+				if errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.ENOSYS) || errors.Is(err, syscall.EOPNOTSUPP) || errors.Is(err, syscall.EINVAL) {
 					src.Close()
 					tgt.Close()
 					return openAndCopyFile(target, source, sync)
