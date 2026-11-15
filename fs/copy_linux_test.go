@@ -20,11 +20,13 @@ package fs
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -200,6 +202,89 @@ func TestCopyFileSparseWithSync(t *testing.T) {
 					srcBlocks, dstBlocks, maxBlocks)
 			}
 		})
+	}
+}
+
+// TestCopyFileRangeErrors checks how copyFile reacts to errors from
+// copy_file_range(2). Filesystems that do not implement the call (for
+// example eCryptfs, which returns EINVAL) must fall back to a plain copy,
+// while unrelated errors such as EIO must still be reported.
+func TestCopyFileRangeErrors(t *testing.T) {
+	orig := copyFileRange
+	t.Cleanup(func() { copyFileRange = orig })
+
+	files := []struct {
+		name  string
+		parts []int64
+	}{
+		{name: "Sparse", parts: []int64{4096, 1024 * 1024, 4096}},
+		{name: "NoHoles", parts: []int64{64 * 1024}},
+	}
+
+	tests := []struct {
+		name     string
+		errno    syscall.Errno
+		fallback bool
+	}{
+		{name: "EINVAL", errno: syscall.EINVAL, fallback: true},
+		{name: "EXDEV", errno: syscall.EXDEV, fallback: true},
+		{name: "ENOSYS", errno: syscall.ENOSYS, fallback: true},
+		{name: "EOPNOTSUPP", errno: syscall.EOPNOTSUPP, fallback: true},
+		{name: "EIO", errno: syscall.EIO, fallback: false},
+	}
+
+	for _, tc := range tests {
+		for _, f := range files {
+			t.Run(tc.name+"/"+f.name, func(t *testing.T) {
+				dir := t.TempDir()
+				srcName := "src"
+				srcPath := filepath.Join(dir, srcName)
+				dstPath := filepath.Join(dir, "dst")
+
+				if err := createSparseFile(srcName, 42, 0o644, f.parts...).Apply(dir); err != nil {
+					t.Fatal(err)
+				}
+
+				calls := 0
+				copyFileRange = func(int, *int64, int, *int64, int, int) (int, error) {
+					calls++
+					return 0, tc.errno
+				}
+
+				err := CopyFile(dstPath, srcPath)
+				if calls == 0 {
+					t.Skip("copy_file_range was not reached (no SEEK_DATA support on this filesystem?)")
+				}
+
+				if !tc.fallback {
+					if err == nil {
+						t.Fatalf("expected an error for %v, got nil", tc.errno)
+					}
+					if !errors.Is(err, tc.errno) {
+						t.Fatalf("expected error wrapping %v, got %v", tc.errno, err)
+					}
+					if !strings.Contains(err.Error(), "copy_file_range failed") {
+						t.Fatalf("expected a copy_file_range failure, got %v", err)
+					}
+					return
+				}
+
+				if err != nil {
+					t.Fatalf("expected fallback to plain copy for %v, got error: %v", tc.errno, err)
+				}
+				srcData, err := os.ReadFile(srcPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				dstData, err := os.ReadFile(dstPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(srcData, dstData) {
+					t.Fatal("source and destination file contents differ")
+				}
+			})
+		}
 	}
 }
 
