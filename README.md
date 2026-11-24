@@ -3,32 +3,22 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/containerd/continuity.svg)](https://pkg.go.dev/github.com/containerd/continuity)
 [![Build Status](https://github.com/containerd/continuity/workflows/Continuity/badge.svg)](https://github.com/containerd/continuity/actions?query=workflow%3AContinuity+branch%3Amain)
 
-A transport-agnostic, filesystem metadata manifest system
+Filesystem utilities for container runtimes and image builders.
 
-This project is a staging area for experiments in providing transport agnostic
-metadata storage.
+## Packages
 
-See [opencontainers/runtime-spec#11](https://github.com/opencontainers/runtime-spec/issues/11)
-for more details.
-
-## Manifest Format
-
-A continuity manifest encodes filesystem metadata in Protocol Buffers.
-Refer to [proto/manifest.proto](proto/manifest.proto) for more details.
+- [fs](fs): copying, diffing, and disk usage of directory trees
+- [fs/fstest](fs/fstest): helpers for creating and comparing directory trees in tests
+- [tarconv](tarconv): conversion of tar archives to EROFS images
+- [pkg/ext4](pkg/ext4): creation of ext4 filesystem images
+- [sysx](sysx): extended attribute system calls
+- [devices](devices): device node helpers
+- [driver](driver): filesystem driver abstraction
 
 ## Platforms
 
 continuity primarily targets Linux. Continuity may compile for and work on
 other operating systems, but those platforms are not tested.
-
-## Contribution Guide
-### Building Proto Package
-
-If you change the proto file you will need to rebuild the generated Go with `go generate`.
-
-```console
-$ go generate ./proto
-```
 
 ## Project details
 

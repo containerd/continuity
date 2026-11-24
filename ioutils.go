@@ -17,9 +17,7 @@
 package continuity
 
 import (
-	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/containerd/continuity/fs"
 )
@@ -30,41 +28,4 @@ import (
 // Deprecated: Use github.com/containerd/continuity/fs.AtomicWriteFile instead.
 func AtomicWriteFile(filename string, data []byte, perm os.FileMode) error {
 	return fs.AtomicWriteFile(filename, data, perm)
-}
-
-// atomicWriteFile writes data to a file by first writing to a temp
-// file and calling rename.
-func atomicWriteFile(filename string, r io.Reader, dataSize int64, perm os.FileMode) error {
-	f, err := os.CreateTemp(filepath.Dir(filename), ".tmp-"+filepath.Base(filename))
-	if err != nil {
-		return err
-	}
-	needClose := true
-	defer func() {
-		if needClose {
-			f.Close()
-		}
-	}()
-
-	err = os.Chmod(f.Name(), perm)
-	if err != nil {
-		return err
-	}
-	n, err := io.Copy(f, r)
-	if err == nil && n < dataSize {
-		return io.ErrShortWrite
-	}
-	if err != nil {
-		return err
-	}
-	if err = f.Sync(); err != nil {
-		return err
-	}
-
-	needClose = false
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	return os.Rename(f.Name(), filename)
 }

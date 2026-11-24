@@ -33,9 +33,6 @@ all: AUTHORS lint build test
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
-generate:
-	go generate -mod=vendor $(PACKAGES)
-
 lint:
 	@echo "+ $@"
 	@golangci-lint run
