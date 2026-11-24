@@ -14,7 +14,7 @@
 
 PKG=github.com/containerd/continuity
 
-PACKAGES=$(shell go list -mod=vendor ./... | grep -v /vendor/)
+PACKAGES=$(shell go list ./...)
 TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     ${PACKAGES}, \
     $(shell \
@@ -39,11 +39,11 @@ lint:
 
 build:
 	@echo "+ $@"
-	@go build -mod=vendor -v ${GO_LDFLAGS} $(PACKAGES)
+	@go build -v ${GO_LDFLAGS} $(PACKAGES)
 
 test:
 	@echo "+ $@"
-	@go test -mod=vendor $(PACKAGES)
+	@go test $(PACKAGES)
 
 root-test:
 	@echo "+ $@"
@@ -51,4 +51,4 @@ root-test:
 
 test-compile:
 	@echo "+ $@"
-	@for pkg in $(PACKAGES); do go test -mod=vendor -c $$pkg; done
+	@for pkg in $(PACKAGES); do go test -c $$pkg; done
