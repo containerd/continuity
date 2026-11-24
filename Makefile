@@ -12,12 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Set an output prefix, which is the local directory if not specified
-PREFIX?=$(shell pwd)
-
 PKG=github.com/containerd/continuity
 
-PACKAGES=$(shell go list -mod=vendor ./... | grep -v /vendor/)
+PACKAGES=$(shell go list ./...)
 TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     ${PACKAGES}, \
     $(shell \
@@ -28,33 +25,25 @@ TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     done | sort -u) \
     )
 
-.PHONY: clean all lint build test binaries
+.PHONY: all lint build test
 .DEFAULT: default
 
-all: AUTHORS clean lint build test binaries
+all: AUTHORS lint build test
 
 AUTHORS: .mailmap .git/HEAD
 	 git log --format='%aN <%aE>' | sort -fu > $@
 
-${PREFIX}/bin/continuity:
-	@echo "+ $@"
-	@(cd cmd/continuity && go build -mod=mod -o $@  ${GO_GCFLAGS} .)
-
-generate:
-	go generate -mod=vendor $(PACKAGES)
-
 lint:
 	@echo "+ $@"
 	@golangci-lint run
-	@(cd cmd/continuity && golangci-lint --config=../../.golangci.yml run)
 
 build:
 	@echo "+ $@"
-	@go build -mod=vendor -v ${GO_LDFLAGS} $(PACKAGES)
+	@go build -v ${GO_LDFLAGS} $(PACKAGES)
 
 test:
 	@echo "+ $@"
-	@go test -mod=vendor $(PACKAGES)
+	@go test $(PACKAGES)
 
 root-test:
 	@echo "+ $@"
@@ -62,13 +51,4 @@ root-test:
 
 test-compile:
 	@echo "+ $@"
-	@for pkg in $(PACKAGES); do go test -mod=vendor -c $$pkg; done
-
-binaries: ${PREFIX}/bin/continuity
-	@echo "+ $@"
-	@if [ x$$GOOS = xwindows ]; then echo "+ continuity -> continuity.exe"; mv ${PREFIX}/bin/continuity ${PREFIX}/bin/continuity.exe; fi
-
-clean:
-	@echo "+ $@"
-	@rm -rf "${PREFIX}/bin/continuity" "${PREFIX}/bin/continuity.exe"
-
+	@for pkg in $(PACKAGES); do go test -c $$pkg; done
